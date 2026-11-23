@@ -1,8 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { JobRecord, JobStore, ThreadRef, Usage } from '@anbiq/core';
-import type { ConversationMemory } from '@anbiq/tap-whatsapp-twilio';
+import type { ConversationMemory, JobRecord, JobStore, ThreadRef, Usage } from '@anbiq/core';
 
 /** Delivered-message keys are kept this long; platforms stop retrying long before. */
 const MESSAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;

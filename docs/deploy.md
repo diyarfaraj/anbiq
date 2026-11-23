@@ -43,6 +43,8 @@ The full schema is in [architecture.md](architecture.md). The server refuses to 
 | `SLACK_BOT_TOKEN`            | with Slack          | The bot token (`xoxb-…`) with `chat:write`                             |
 | `TWILIO_ACCOUNT_SID`         | with WhatsApp       | Twilio account SID                                                     |
 | `TWILIO_AUTH_TOKEN`          | with WhatsApp       | Twilio auth token                                                      |
+| `TELEGRAM_BOT_TOKEN`         | with Telegram       | The bot token from @BotFather                                          |
+| `TELEGRAM_SECRET_TOKEN`      | with Telegram       | The `secret_token` given to `setWebhook`                               |
 | `ANBIQ_BASE_BRANCH`          | no, `main`          | The branch pull requests target and the workflow is read from          |
 | `ANBIQ_WORKFLOW`             | no, `anbiq-run.yml` | The crew workflow file name                                            |
 | `PORT`                       | no, `8080`          | Port to listen on                                                      |
@@ -71,6 +73,7 @@ Put it behind a TLS-terminating proxy (Caddy, a cloud load balancer, or a tunnel
 | Endpoint                     | Who calls it                                         |
 | ---------------------------- | ---------------------------------------------------- |
 | `POST /taps/slack`           | Slack Events API request URL                         |
+| `POST /taps/telegram`        | Telegram `setWebhook` URL                            |
 | `POST /taps/whatsapp-twilio` | Twilio WhatsApp sender, "a message comes in" webhook |
 | `POST /runs/:runId`          | The crew workflow, with a signed result              |
 | `GET /board`                 | You, in a browser, when the board is turned on       |

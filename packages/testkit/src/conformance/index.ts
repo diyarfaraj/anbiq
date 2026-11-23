@@ -30,11 +30,17 @@ export interface TapHarness {
     text: string;
   }): InboundHttpRequest;
   nonMessage(): InboundHttpRequest;
+  /**
+   * False for platforms that authenticate webhooks with a shared secret header but do not
+   * sign the body (Telegram). The tamper test is skipped for them, and their README says so.
+   */
+  signsBody?: boolean;
 }
 
 export function describeTapConformance(name: string, setup: () => TapHarness): void {
   describe(`${name}: tap conformance`, () => {
-    const input = { userId: 'U1', channel: 'C1', thread: 'T1', text: 'add a copy-link button' };
+    // Numeric IDs, because some platforms (Telegram, Discord) only have numeric ones.
+    const input = { userId: '1001', channel: 'C1', thread: 'T1', text: 'add a copy-link button' };
 
     it('verifies a correctly signed request', async () => {
       const h = setup();
@@ -46,19 +52,22 @@ export function describeTapConformance(name: string, setup: () => TapHarness): v
       expect(await h.tap.verify(h.unsigned(input))).toBe(false);
     });
 
-    it('rejects a request whose body changed after signing', async () => {
-      const h = setup();
-      const request = h.signed(input);
-      const tampered = { ...request, body: request.body.replace('copy-link', 'delete-all') };
-      expect(await h.tap.verify(tampered)).toBe(false);
-    });
+    it.skipIf(setup().signsBody === false)(
+      'rejects a request whose body changed after signing',
+      async () => {
+        const h = setup();
+        const request = h.signed(input);
+        const tampered = { ...request, body: request.body.replace('copy-link', 'delete-all') };
+        expect(await h.tap.verify(tampered)).toBe(false);
+      },
+    );
 
     it('parses the sender, thread and text of a message', async () => {
       const h = setup();
       const message = await h.tap.parse(h.signed(input));
       expect(message).not.toBeNull();
       expect(message?.tap).toBe(h.tap.id);
-      expect(message?.userId).toBe('U1');
+      expect(message?.userId).toBe('1001');
       expect(message?.text).toBe('add a copy-link button');
     });
 
