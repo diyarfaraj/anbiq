@@ -152,8 +152,9 @@ taps:
     numbers: ['+15550100']
 people:
   - name: Owner
-    slack: U012ABCDEF
-    whatsapp: '+15550123'
+    ids: # keyed by tap; display names are never used
+      slack: U012ABCDEF
+      whatsapp-twilio: '+15550123'
     roles: [requester, approver]
 tracker: github-issues
 git_host: github
@@ -170,6 +171,8 @@ policy:
   deploy: human
   human_review_paths: ['infra/**', '.github/workflows/**', '**/migrations/**']
   confirm_commands: ['deploy production'] # asks for a second confirmation
+  deploy_environments: [staging, production]
+  max_revisions: 3 # then a person takes over
 budgets:
   usd_per_day: 25
   jobs_per_day: 10
