@@ -22,8 +22,15 @@ export interface InboundHttpRequest {
   body: string;
 }
 
+export interface HttpResponse {
+  status: number;
+  body?: string;
+  contentType?: string;
+}
+
 export interface InboundMessage {
   tap: string;
+  /** Unique per user message on the tap. Platforms that deliver a message twice give both deliveries the same ID. */
   messageId: string;
   /** The platform's stable user ID. Never a display name. */
   userId: string;
@@ -58,6 +65,11 @@ export interface Tap {
   /** Returns null for platform events that are not user messages. */
   parse(request: InboundHttpRequest): Promise<InboundMessage | null>;
   send(thread: ThreadRef, message: OutboundMessage): Promise<void>;
+  /**
+   * Answers a verified platform handshake, such as a webhook URL challenge.
+   * Returns null when the request is not a handshake.
+   */
+  handshake?(request: InboundHttpRequest): Promise<HttpResponse | null>;
 }
 
 // ── Tracker and git host ────────────────────────────────────────────────
@@ -194,6 +206,8 @@ export interface JobStore {
   recordCost(jobId: string, usd: number, at: string): Promise<void>;
   /** Spend and job counts for the UTC day containing `at`, and jobs running now. */
   usage(at: string): Promise<Usage>;
+  /** Records a delivered message. Returns false if the same key was recorded before. */
+  claimMessage(key: string): Promise<boolean>;
 }
 
 export type FactoryEventKind =

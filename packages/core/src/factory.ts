@@ -12,6 +12,7 @@ import {
   type EventSink,
   type FactoryEvent,
   type GitHost,
+  type HttpResponse,
   type InboundHttpRequest,
   type InboundMessage,
   type JobRecord,
@@ -41,7 +42,7 @@ export interface FactoryDeps {
 
 export interface Factory {
   /** Verifies, parses and handles one request from a tap's webhook. */
-  handleHttp(tapId: string, request: InboundHttpRequest): Promise<{ status: 200 | 401 | 404 }>;
+  handleHttp(tapId: string, request: InboundHttpRequest): Promise<HttpResponse>;
   /** Handles a message that a tap has already verified and parsed. */
   handleMessage(message: InboundMessage): Promise<void>;
   /** Moves a job on when a runner reports that a run ended. */
@@ -155,16 +156,21 @@ export function createFactory(deps: FactoryDeps): Factory {
     return stopped;
   }
 
-  async function handleHttp(tapId: string, request: InboundHttpRequest) {
+  async function handleHttp(tapId: string, request: InboundHttpRequest): Promise<HttpResponse> {
     const tap = taps.get(tapId);
-    if (!tap) return { status: 404 as const };
-    if (!(await tap.verify(request))) return { status: 401 as const };
+    if (!tap) return { status: 404 };
+    if (!(await tap.verify(request))) return { status: 401 };
+    const handshake = await tap.handshake?.(request);
+    if (handshake) return handshake;
     const message = await tap.parse(request);
     if (message) await handleMessage(message);
-    return { status: 200 as const };
+    return { status: 200 };
   }
 
   async function handleMessage(message: InboundMessage): Promise<void> {
+    // Platforms retry webhooks and can deliver one message as several events.
+    if (!(await store.claimMessage(`${message.tap}:${message.messageId}`))) return;
+
     const person = findPerson(config, message.tap, message.userId);
     if (!person) {
       // Unknown senders get no reply, so the factory cannot be probed or spammed through it.

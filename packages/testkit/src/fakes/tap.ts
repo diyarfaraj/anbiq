@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   InboundHttpRequest,
   InboundMessage,
@@ -21,7 +21,7 @@ const SIGNATURE_HEADER = 'x-fake-signature';
 /** A tap that signs its webhook bodies with HMAC-SHA256, the way most chat platforms do. */
 export class FakeTap implements Tap {
   readonly sent: { thread: ThreadRef; message: OutboundMessage }[] = [];
-  private counter = 0;
+  private messages = 0;
 
   constructor(
     readonly id: string,
@@ -50,7 +50,8 @@ export class FakeTap implements Tap {
     }
     return {
       tap: this.id,
-      messageId: payload.messageId ?? `m${++this.counter}`,
+      messageId:
+        payload.messageId ?? createHash('sha256').update(request.body).digest('hex').slice(0, 16),
       userId: payload.userId,
       thread: { tap: this.id, channel: payload.channel, thread: payload.thread },
       text: payload.text ?? '',
@@ -62,15 +63,20 @@ export class FakeTap implements Tap {
     this.sent.push({ thread, message });
   }
 
-  /** A correctly signed webhook request carrying a user message. */
+  /** A correctly signed webhook request carrying a new user message. */
   signedRequest(input: FakeMessageInput): InboundHttpRequest {
-    const body = JSON.stringify({ type: 'message', ...input });
+    const body = this.messageBody(input);
     return this.request(body, this.sign(body));
   }
 
   unsignedRequest(input: FakeMessageInput): InboundHttpRequest {
-    const body = JSON.stringify({ type: 'message', ...input });
+    const body = this.messageBody(input);
     return { method: 'POST', url: `https://factory.test/taps/${this.id}`, headers: {}, body };
+  }
+
+  /** Each call is a new message, like a platform's per-message timestamp; re-sending the same request is a duplicate. */
+  private messageBody(input: FakeMessageInput): string {
+    return JSON.stringify({ type: 'message', messageId: `m${++this.messages}`, ...input });
   }
 
   /** A platform event that is not a message, such as a URL verification ping. */

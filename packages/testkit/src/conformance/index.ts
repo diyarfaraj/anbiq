@@ -69,6 +69,14 @@ export function describeTapConformance(name: string, setup: () => TapHarness): v
       expect(second?.thread).toEqual(first?.thread);
     });
 
+    it('gives a repeated delivery of the same request the same message ID', async () => {
+      const h = setup();
+      const request = h.signed(input);
+      const first = await h.tap.parse(request);
+      const again = await h.tap.parse(request);
+      expect(again?.messageId).toBe(first?.messageId);
+    });
+
     it('returns null for platform events that are not messages', async () => {
       const h = setup();
       expect(await h.tap.parse(h.nonMessage())).toBeNull();
@@ -232,6 +240,13 @@ export function describeJobStoreConformance(name: string, setup: () => JobStore)
       await store.save(record('early', '2026-11-23T08:00:00Z', { queued: { stage: 'spec' } }));
       await store.save(record('idle', '2026-11-23T07:00:00Z'));
       expect((await store.listQueued()).map((job) => job.id)).toEqual(['early', 'late']);
+    });
+
+    it('claims each delivered message only once', async () => {
+      const store = setup();
+      expect(await store.claimMessage('slack:C1:1700000000.0001')).toBe(true);
+      expect(await store.claimMessage('slack:C1:1700000000.0001')).toBe(false);
+      expect(await store.claimMessage('slack:C1:1700000000.0002')).toBe(true);
     });
 
     it("counts today's jobs and spend and the jobs running now", async () => {

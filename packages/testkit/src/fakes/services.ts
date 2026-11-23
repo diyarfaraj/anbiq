@@ -158,6 +158,13 @@ export class FakeDeployer implements Deployer {
 export class MemoryJobStore implements JobStore {
   private readonly jobs = new Map<string, JobRecord>();
   private readonly costs: { jobId: string; usd: number; at: string }[] = [];
+  private readonly seenMessages = new Set<string>();
+
+  async claimMessage(key: string): Promise<boolean> {
+    if (this.seenMessages.has(key)) return false;
+    this.seenMessages.add(key);
+    return true;
+  }
 
   async get(id: string): Promise<JobRecord | undefined> {
     const job = this.jobs.get(id);
