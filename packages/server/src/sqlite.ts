@@ -23,6 +23,9 @@ const MIGRATIONS = [
    CREATE INDEX costs_at ON costs (at);
    CREATE TABLE messages (key TEXT PRIMARY KEY, at INTEGER NOT NULL);
    CREATE TABLE memory (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+  `CREATE TABLE events (id TEXT PRIMARY KEY, at TEXT NOT NULL, job TEXT, data TEXT NOT NULL);
+   CREATE INDEX events_at ON events (at);
+   CREATE INDEX events_job ON events (job, at);`,
 ];
 
 /** One SQLite file holding jobs, costs, delivered messages and tap conversation memory. */
@@ -112,6 +115,14 @@ export class SqliteJobStore implements JobStore {
     const rows = this.db
       .prepare('SELECT data FROM jobs WHERE queued = 1 ORDER BY updated_at, rowid')
       .all() as { data: string }[];
+    return rows.map((row) => JSON.parse(row.data) as JobRecord);
+  }
+
+  /** The most recently updated jobs, newest first. Not part of the JobStore port; for the board. */
+  listRecent(limit: number): JobRecord[] {
+    const rows = this.db
+      .prepare('SELECT data FROM jobs ORDER BY updated_at DESC, rowid DESC LIMIT ?')
+      .all(limit) as { data: string }[];
     return rows.map((row) => JSON.parse(row.data) as JobRecord);
   }
 

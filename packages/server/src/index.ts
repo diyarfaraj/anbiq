@@ -1,5 +1,8 @@
 export { buildApp, loadSettings, StartupError } from './app.js';
 export type { App, BuildOptions, Settings } from './app.js';
+export { createBoard } from './board.js';
+export type { BoardOptions } from './board.js';
+export { factoryEventSchema, SqliteEventSink } from './events.js';
 export { createHandler, MAX_BODY_BYTES } from './http.js';
 export type { HandlerOptions } from './http.js';
 export { jsonLogger } from './log.js';

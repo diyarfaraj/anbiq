@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createServer } from 'node:http';
 import { buildApp, loadSettings, StartupError } from './app.js';
+import { createBoard } from './board.js';
 import { createHandler } from './http.js';
 import { errorFields, jsonLogger } from './log.js';
 
@@ -19,12 +20,28 @@ function start(): void {
   }
 
   const app = buildApp(loaded.settings, loaded.config, process.env, { logger });
+  const { settings } = app;
   const server = createServer(
     createHandler({
       factory: app.factory,
       queue: app.queue,
-      callbackSecret: app.settings.ANBIQ_CALLBACK_SECRET,
+      callbackSecret: settings.ANBIQ_CALLBACK_SECRET,
       logger,
+      ...(settings.ANBIQ_BOARD_PASSWORD
+        ? {
+            board: createBoard({
+              password: settings.ANBIQ_BOARD_PASSWORD,
+              sessionSecret: settings.ANBIQ_CALLBACK_SECRET,
+              config: app.config,
+              store: app.store,
+              events: app.events,
+              logger,
+            }),
+          }
+        : {}),
+      ...(settings.ANBIQ_EVENTS_SECRET
+        ? { events: { sink: app.events, secret: settings.ANBIQ_EVENTS_SECRET } }
+        : {}),
     }),
   );
   server.requestTimeout = 30_000;

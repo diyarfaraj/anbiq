@@ -48,6 +48,8 @@ The full schema is in [architecture.md](architecture.md). The server refuses to 
 | `PORT`                       | no, `8080`          | Port to listen on                                                      |
 | `ANBIQ_CONFIG`               | no                  | Path to `anbiq.yml` (`/config/anbiq.yml` in the image)                 |
 | `ANBIQ_DATA`                 | no                  | Path to the SQLite file (`/data/anbiq.db` in the image)                |
+| `ANBIQ_BOARD_PASSWORD`       | no                  | At least 12 characters; turns on the live board at `/board`            |
+| `ANBIQ_EVENTS_SECRET`        | no                  | At least 32 characters; turns on `POST /events` for remote factories   |
 
 Keep secrets in your platform's secret store, not in `anbiq.yml`.
 
@@ -71,6 +73,7 @@ Put it behind a TLS-terminating proxy (Caddy, a cloud load balancer, or a tunnel
 | `POST /taps/slack`           | Slack Events API request URL                         |
 | `POST /taps/whatsapp-twilio` | Twilio WhatsApp sender, "a message comes in" webhook |
 | `POST /runs/:runId`          | The crew workflow, with a signed result              |
+| `GET /board`                 | You, in a browser, when the board is turned on       |
 | `GET /healthz`               | Your load balancer or uptime check                   |
 
 Every webhook is verified with the platform's signature before it is read. Messages are acknowledged at once and handled after, one at a time, so platforms never retry because of a slow reply.
@@ -78,3 +81,17 @@ Every webhook is verified with the platform's signature before it is read. Messa
 ## Logs
 
 One JSON object per line on stdout: requests (method, path, status, duration), run results (run, job, stage, outcome) and errors. Message text, headers and secrets are never logged.
+
+## The live board
+
+Set `ANBIQ_BOARD_PASSWORD` and open `/board`. It is read-only and shows:
+
+- the pipeline: jobs by stage, with how long each has been in it;
+- the crews working right now and how long they have run;
+- a live feed of factory events, streamed as they happen;
+- a timeline per job, with links to its issue and pull request;
+- spend, jobs and running crews today against the budgets in `anbiq.yml`.
+
+It shows the time spent in each step, never an invented progress percentage. Sessions last seven days in an HTTP-only, `SameSite=Strict` cookie, repeated wrong passwords are slowed down, and the page runs under a strict Content Security Policy. Job titles are shown; full request text, feedback and answers are not.
+
+A factory running elsewhere can feed the same board by posting each event, signed like a run callback, to `POST /events` with `ANBIQ_EVENTS_SECRET`.
