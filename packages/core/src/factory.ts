@@ -164,7 +164,7 @@ export function createFactory(deps: FactoryDeps): Factory {
     if (handshake) return handshake;
     const message = await tap.parse(request);
     if (message) await handleMessage(message);
-    return { status: 200 };
+    return tap.acknowledgement ?? { status: 200 };
   }
 
   async function handleMessage(message: InboundMessage): Promise<void> {

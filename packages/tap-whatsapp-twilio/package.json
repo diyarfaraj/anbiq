@@ -1,0 +1,27 @@
+{
+  "name": "@anbiq/tap-whatsapp-twilio",
+  "version": "0.0.0",
+  "description": "WhatsApp tap for Anbiq, through Twilio's WhatsApp Business messaging.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anbiq/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@anbiq/testkit": "workspace:*"
+  }
+}

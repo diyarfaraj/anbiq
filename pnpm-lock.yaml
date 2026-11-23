@@ -49,6 +49,16 @@ importers:
         specifier: workspace:*
         version: link:../testkit
 
+  packages/tap-whatsapp-twilio:
+    dependencies:
+      '@anbiq/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@anbiq/testkit':
+        specifier: workspace:*
+        version: link:../testkit
+
   packages/testkit:
     dependencies:
       '@anbiq/core':
