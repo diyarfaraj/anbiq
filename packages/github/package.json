@@ -1,0 +1,27 @@
+{
+  "name": "@anbiq/github",
+  "version": "0.0.0",
+  "description": "GitHub tracker and git host for Anbiq: jobs as issues, work as pull requests, authenticated as a GitHub App.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anbiq/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@anbiq/testkit": "workspace:*"
+  }
+}
