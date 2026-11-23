@@ -1,9 +1,25 @@
 {
   "name": "@anbiq/tap-whatsapp-twilio",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "WhatsApp tap for Anbiq, through Twilio's WhatsApp Business messaging.",
-  "private": true,
   "license": "MIT",
+  "author": "Diyar Faraj",
+  "homepage": "https://github.com/diyarfaraj/anbiq/tree/main/packages/tap-whatsapp-twilio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diyarfaraj/anbiq.git",
+    "directory": "packages/tap-whatsapp-twilio"
+  },
+  "bugs": "https://github.com/diyarfaraj/anbiq/issues",
+  "keywords": [
+    "anbiq",
+    "whatsapp",
+    "twilio",
+    "chatops"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -23,5 +39,8 @@
   },
   "devDependencies": {
     "@anbiq/testkit": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

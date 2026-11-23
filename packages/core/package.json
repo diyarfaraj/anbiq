@@ -1,9 +1,26 @@
 {
   "name": "@anbiq/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Anbiq core: jobs, stages, commands and policy, independent of any chat app, tracker or runner.",
-  "private": true,
   "license": "MIT",
+  "author": "Diyar Faraj",
+  "homepage": "https://github.com/diyarfaraj/anbiq/tree/main/packages/core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diyarfaraj/anbiq.git",
+    "directory": "packages/core"
+  },
+  "bugs": "https://github.com/diyarfaraj/anbiq/issues",
+  "keywords": [
+    "anbiq",
+    "software-factory",
+    "ai-agents",
+    "coding-agents",
+    "automation"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -21,5 +38,8 @@
   "dependencies": {
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
