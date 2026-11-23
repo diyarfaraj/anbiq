@@ -17,6 +17,21 @@ Open or comment on an issue first, so we agree on the approach before you spend 
 - Describe what you tested and what you did not.
 - Do not add a dependency without saying why it is needed.
 
+## Development
+
+You need Node.js 22 or newer and pnpm (the version is pinned in `package.json`; `corepack enable` picks it up).
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm test
+pnpm build
+```
+
+CI runs the same commands on Node 22 and 24 for every pull request.
+
 ## Code of conduct
 
 Be respectful and assume good faith. Harassment and personal attacks are not tolerated, and the maintainer may remove comments, issues or contributors that break this rule.
