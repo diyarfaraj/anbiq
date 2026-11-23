@@ -109,6 +109,54 @@ interface EventSink {
 }
 ```
 
+### Deployer
+
+```ts
+interface Deployer {
+  deploy(input: {
+    jobId: string;
+    environment: string;
+    pullRequest: PullRequestRef;
+  }): Promise<{ url?: string }>;
+}
+```
+
+Optional. A project without a deployer can still merge; `deploy` then replies that nothing is configured. The deployer runs outside the agent's job, so deploy credentials never reach an agent.
+
+### Job store
+
+```ts
+interface JobStore {
+  get(id: string): Promise<JobRecord | undefined>;
+  save(job: JobRecord): Promise<void>;
+  findByThread(thread: ThreadRef): Promise<JobRecord | undefined>;
+  listQueued(): Promise<JobRecord[]>;
+  recordCost(jobId: string, usd: number, at: string): Promise<void>;
+  usage(at: string): Promise<Usage>;
+}
+```
+
+Holds what the tracker cannot: which conversation a job belongs to, the active run, the reviewed commit, queued stages and spend.
+
+The exact definitions live in [`packages/core/src/ports.ts`](../packages/core/src/ports.ts). [Writing an adapter](writing-an-adapter.md) explains how to build and test one.
+
+## The orchestrator
+
+`createFactory()` in `@anbiq/core` wires the slots together and moves jobs:
+
+- **A request** in a new thread creates a job and an issue, then starts the spec crew.
+- **When a run ends:**
+  - spec passes → build;
+  - build passes → a pull request is opened (once), then QA;
+  - QA passes → review;
+  - review passes → awaiting approval, recording the commit it reviewed.
+- **Failures:**
+  - QA or review failing sends the work back to build, up to `policy.max_bounces` times;
+  - a crew that needs input asks in the thread, and the next reply resumes it.
+- **Stale results:** only the active run can move a job, so results from cancelled or replaced runs are ignored.
+- **Commands** in a job's thread (`revise:`, `merge`, `deploy`, `status`, `cancel`) go through the policy first; confirmations are answered with `yes`.
+- **Queueing:** a stage that cannot start because of the concurrency or spend limit is queued, and the queue drains whenever a run ends or a job is cancelled.
+
 ## Events
 
 Everything that happens is an event, which drives the live board and the audit trail. Events carry metadata only: never source code, secrets or full logs.
