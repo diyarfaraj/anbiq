@@ -51,6 +51,12 @@ describe('ClaudeCodeEngine', () => {
     expect(prompt).toContain('<feedback>\nmake it larger\n</feedback>');
   });
 
+  it("points each crew at the project's own instructions for its stage", () => {
+    const prompt = engine.prepare({ stage: 'qa', request: 'x', config }).prompt;
+    expect(prompt).toContain('.anbiq/crews/qa.md');
+    expect(prompt).toContain('.anbiq/crews/all.md');
+  });
+
   it('tells the crew where to write its result', () => {
     expect(engine.prepare({ stage: 'qa', request: 'x', config }).prompt).toContain(RESULT_FILE);
   });

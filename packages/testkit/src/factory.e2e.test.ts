@@ -236,6 +236,19 @@ describe('revisions and failures', () => {
     expect(f.gitHost.pullRequests.get(prId)?.merged).toBe(false);
   });
 
+  it('hands the job back to a person after the maximum number of revisions', async () => {
+    const f = setup((yaml) => yaml.replace('max_bounces: 2', 'max_bounces: 2\n  max_revisions: 1'));
+    await f.toApproval('sha-1');
+    await f.say(OWNER, 'revise: make it larger');
+    await f.finish('passed'); // build
+    await f.finish('passed', { headSha: 'sha-1' }); // qa
+    await f.finish('passed', { headSha: 'sha-1' }); // review
+    const runs = f.runner.started.length;
+    await f.say(OWNER, 'revise: and blue');
+    expect(f.lastReply()).toMatch(/a person needs to take over/);
+    expect(f.runner.started).toHaveLength(runs);
+  });
+
   it('bounces failed QA back to build, then hands over to a person after the limit', async () => {
     const f = setup();
     await f.say(OWNER, 'Add a button');

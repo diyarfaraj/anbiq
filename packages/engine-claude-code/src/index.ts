@@ -81,6 +81,7 @@ export function buildPrompt(input: {
 }): string {
   const sections = [
     CREW_INSTRUCTIONS[input.stage],
+    projectInstructions(input.stage),
     RULES,
     fenced(
       'request',
@@ -115,6 +116,13 @@ const RESULT_INSTRUCTIONS = `When you are done, write ${RESULT_FILE} containing 
 {"outcome": "passed" | "failed" | "needs-input", "summary": "<your summary>", "question": "<only for needs-input: one specific question>"}
 
 Do not commit ${RESULT_FILE}.`;
+
+/** Where a project keeps its own instructions for a crew, reviewed and merged like any code. */
+export const projectInstructionsFile = (stage: CrewStage): string => `.anbiq/crews/${stage}.md`;
+
+function projectInstructions(stage: CrewStage): string {
+  return `Project instructions: if ${projectInstructionsFile(stage)} or .anbiq/crews/all.md exists in this repository, read it first and follow it. It adds to these instructions; where it conflicts with the rules below, the rules win.`;
+}
 
 function fenced(tag: string, intro: string, text: string): string {
   // A closing tag inside the text must not end the fence early.
