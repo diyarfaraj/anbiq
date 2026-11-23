@@ -45,6 +45,8 @@ The full schema is in [architecture.md](architecture.md). The server refuses to 
 | `TWILIO_AUTH_TOKEN`          | with WhatsApp       | Twilio auth token                                                      |
 | `TELEGRAM_BOT_TOKEN`         | with Telegram       | The bot token from @BotFather                                          |
 | `TELEGRAM_SECRET_TOKEN`      | with Telegram       | The `secret_token` given to `setWebhook`                               |
+| `DISCORD_PUBLIC_KEY`         | with Discord        | The application's public key (hex)                                     |
+| `DISCORD_BOT_TOKEN`          | with Discord        | The bot token                                                          |
 | `ANBIQ_BASE_BRANCH`          | no, `main`          | The branch pull requests target and the workflow is read from          |
 | `ANBIQ_WORKFLOW`             | no, `anbiq-run.yml` | The crew workflow file name                                            |
 | `PORT`                       | no, `8080`          | Port to listen on                                                      |
