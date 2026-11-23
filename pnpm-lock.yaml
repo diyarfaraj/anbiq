@@ -74,6 +74,34 @@ importers:
         specifier: ^2.9.1
         version: 2.9.1
 
+  packages/server:
+    dependencies:
+      '@anbiq/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anbiq/engine-claude-code':
+        specifier: workspace:*
+        version: link:../engine-claude-code
+      '@anbiq/github':
+        specifier: workspace:*
+        version: link:../github
+      '@anbiq/runner-github-actions':
+        specifier: workspace:*
+        version: link:../runner-github-actions
+      '@anbiq/tap-slack':
+        specifier: workspace:*
+        version: link:../tap-slack
+      '@anbiq/tap-whatsapp-twilio':
+        specifier: workspace:*
+        version: link:../tap-whatsapp-twilio
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@anbiq/testkit':
+        specifier: workspace:*
+        version: link:../testkit
+
   packages/tap-slack:
     dependencies:
       '@anbiq/core':
