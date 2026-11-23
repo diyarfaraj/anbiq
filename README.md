@@ -1,8 +1,8 @@
 # Anbiq
 
-**Anbiq** (an-BEEK), from Arabic *al-anbīq* (الأنبيق), the alchemist's still that became the "alembic".
+**Anbiq** (an-BEEK), from Arabic _al-anbīq_ (الأنبيق), the alchemist's still that became the "alembic".
 
-*Distill requests into shipped code.*
+_Distill requests into shipped code._
 
 Anbiq is an open-source software factory. You send a request from the chat app you already use (Slack, Microsoft Teams, WhatsApp, and more). Anbiq turns it into a tracked job, and coding agents plan, build, test and review it. You get a pull request back in the same conversation. Nothing is merged or deployed until you say so.
 
@@ -12,12 +12,12 @@ Anbiq is an open-source software factory. You send a request from the chat app y
 
 A still has four parts, and so does Anbiq:
 
-| Part of the still | In Anbiq |
-|---|---|
-| **Cucurbit**: the pot where the raw mix goes in | **Intake**: requests arrive from any connected chat app and become jobs in your tracker |
-| **Head**: where the vapour rises and separates | **Crews**: agents work each job in stages, from spec to build to QA to review |
-| **Beak**: the spout the distillate runs out of | **Pull request**: tested, reviewed and described, posted back to your conversation |
-| **Receiver**: the flask that collects the result | **Merge and deploy**: only when you reply with an explicit command |
+| Part of the still                                | In Anbiq                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Cucurbit**: the pot where the raw mix goes in  | **Intake**: requests arrive from any connected chat app and become jobs in your tracker |
+| **Head**: where the vapour rises and separates   | **Crews**: agents work each job in stages, from spec to build to QA to review           |
+| **Beak**: the spout the distillate runs out of   | **Pull request**: tested, reviewed and described, posted back to your conversation      |
+| **Receiver**: the flask that collects the result | **Merge and deploy**: only when you reply with an explicit command                      |
 
 ```
  chat app ──► tap ──► core ──► tracker issue ──► runner (agents: spec → build → QA → review)
@@ -36,14 +36,14 @@ A still has four parts, and so does Anbiq:
 
 ## Modules
 
-| Slot | First implementation | Planned |
-|---|---|---|
+| Slot               | First implementation         | Planned                                                             |
+| ------------------ | ---------------------------- | ------------------------------------------------------------------- |
 | Tap (chat channel) | Slack, WhatsApp (via Twilio) | Microsoft Teams, Telegram, Discord, email; iMessage as experimental |
-| Tracker | GitHub Issues | Linear, Jira |
-| Git host | GitHub | GitLab |
-| Runner | GitHub Actions | self-hosted machine, hosted agent sandboxes |
-| Agent engine | Claude Code | other coding agents |
-| Event sink | Anbiq live board | OpenTelemetry |
+| Tracker            | GitHub Issues                | Linear, Jira                                                        |
+| Git host           | GitHub                       | GitLab                                                              |
+| Runner             | GitHub Actions               | self-hosted machine, hosted agent sandboxes                         |
+| Agent engine       | Claude Code                  | other coding agents                                                 |
+| Event sink         | Anbiq live board             | OpenTelemetry                                                       |
 
 See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lifecycle and the security model.
 

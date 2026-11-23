@@ -1,0 +1,21 @@
+{
+  "name": "@anbiq/core",
+  "version": "0.0.0",
+  "description": "Anbiq core: jobs, stages, commands and policy, independent of any chat app, tracker or runner.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -11,14 +11,14 @@ This document describes how Anbiq is meant to work. It is a design, not a descri
 
 ## Terms
 
-| Term | Meaning |
-|---|---|
-| **Request** | A message asking for work, from any tap. |
-| **Job** | One unit of work, created from a request. Every job is an issue in the tracker. |
-| **Stage** | Where a job is in the pipeline: `intake`, `spec`, `build`, `qa`, `review`, `awaiting-approval`, `merged`, `deployed`, plus `blocked` and `cancelled`. |
-| **Run** | One execution of one stage on a runner. A run never waits for a person: it ends, and a person's later reply starts a new run. |
-| **Crew** | The agent role that does a stage's work (spec, build, QA, review). |
-| **Policy** | Per-project rules: who may request and approve, which checks must pass, which paths need a person, and budgets. |
+| Term        | Meaning                                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Request** | A message asking for work, from any tap.                                                                                                              |
+| **Job**     | One unit of work, created from a request. Every job is an issue in the tracker.                                                                       |
+| **Stage**   | Where a job is in the pipeline: `intake`, `spec`, `build`, `qa`, `review`, `awaiting-approval`, `merged`, `deployed`, plus `blocked` and `cancelled`. |
+| **Run**     | One execution of one stage on a runner. A run never waits for a person: it ends, and a person's later reply starts a new run.                         |
+| **Crew**    | The agent role that does a stage's work (spec, build, QA, review).                                                                                    |
+| **Policy**  | Per-project rules: who may request and approve, which checks must pass, which paths need a person, and budgets.                                       |
 
 ## Components
 
@@ -51,12 +51,12 @@ interface Tap {
   id: string; // "slack", "whatsapp-twilio", ...
   capabilities: {
     threads: boolean;
-    actions: boolean;            // buttons or similar
+    actions: boolean; // buttons or similar
     editMessages: boolean;
     maxLength: number;
-    replyWindowHours?: number;   // e.g. WhatsApp's 24-hour customer-service window
+    replyWindowHours?: number; // e.g. WhatsApp's 24-hour customer-service window
   };
-  verify(req: InboundHttpRequest): Promise<boolean>;            // platform signature check
+  verify(req: InboundHttpRequest): Promise<boolean>; // platform signature check
   parse(req: InboundHttpRequest): Promise<InboundMessage | null>; // sender, thread, text
   send(thread: ThreadRef, msg: OutboundMessage): Promise<void>;
 }
@@ -147,13 +147,13 @@ Each project has one file in its repository, for example `anbiq.yml`:
 project: acme-web
 taps:
   slack:
-    channel: "#factory"
+    channel: '#factory'
   whatsapp-twilio:
-    numbers: ["+15550100"]
+    numbers: ['+15550100']
 people:
   - name: Owner
     slack: U012ABCDEF
-    whatsapp: "+15550123"
+    whatsapp: '+15550123'
     roles: [requester, approver]
 tracker: github-issues
 git_host: github
@@ -164,17 +164,17 @@ engine:
   max_turns: 60
   timeout_minutes: 60
 checks:
-  verify: ["pnpm install --frozen-lockfile", "pnpm test", "pnpm lint"]
+  verify: ['pnpm install --frozen-lockfile', 'pnpm test', 'pnpm lint']
 policy:
-  merge: human              # agents never merge
+  merge: human # agents never merge
   deploy: human
-  human_review_paths: ["infra/**", ".github/workflows/**", "**/migrations/**"]
-  confirm_commands: ["deploy production"]   # asks for a second confirmation
+  human_review_paths: ['infra/**', '.github/workflows/**', '**/migrations/**']
+  confirm_commands: ['deploy production'] # asks for a second confirmation
 budgets:
   usd_per_day: 25
   jobs_per_day: 10
   concurrent_jobs: 1
-enabled: true                # the kill switch
+enabled: true # the kill switch
 ```
 
 ## Security model
