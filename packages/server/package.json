@@ -1,0 +1,37 @@
+{
+  "name": "@anbiq/server",
+  "version": "0.0.0",
+  "description": "The Anbiq server: chat webhooks in, runner callbacks back, jobs kept in SQLite.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "anbiq-server": "./dist/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@anbiq/core": "workspace:*",
+    "@anbiq/engine-claude-code": "workspace:*",
+    "@anbiq/github": "workspace:*",
+    "@anbiq/runner-github-actions": "workspace:*",
+    "@anbiq/tap-slack": "workspace:*",
+    "@anbiq/tap-whatsapp-twilio": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@anbiq/testkit": "workspace:*"
+  }
+}

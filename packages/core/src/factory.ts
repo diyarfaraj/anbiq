@@ -38,6 +38,12 @@ export interface FactoryDeps {
   events?: EventSink[];
   now?: () => Date;
   newId?: () => string;
+  /**
+   * Schedules handling a verified message after the webhook is answered, since chat platforms
+   * retry webhooks that take more than a few seconds. Without it, messages are handled before
+   * answering.
+   */
+  defer?: (task: () => Promise<void>) => void;
 }
 
 export interface Factory {
@@ -165,7 +171,10 @@ export function createFactory(deps: FactoryDeps): Factory {
     const handshake = await tap.handshake?.(request);
     if (handshake) return handshake;
     const message = await tap.parse(request);
-    if (message) await handleMessage(message);
+    if (message) {
+      if (deps.defer) deps.defer(() => handleMessage(message));
+      else await handleMessage(message);
+    }
     return tap.acknowledgement ?? { status: 200 };
   }
 

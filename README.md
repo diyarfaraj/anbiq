@@ -45,7 +45,11 @@ A still has four parts, and so does Anbiq:
 | Agent engine       | Claude Code                  | other coding agents                                                 |
 | Event sink         | Anbiq live board             | OpenTelemetry                                                       |
 
-See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lifecycle and the security model.
+See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lifecycle and the security model, and [docs/crews.md](docs/crews.md) for what each crew does.
+
+## Run it
+
+Anbiq runs as one small container with a SQLite file. [docs/deploy.md](docs/deploy.md) walks through the GitHub App, the crew workflow, `anbiq.yml`, the environment and the webhook URLs.
 
 ## Roadmap
 
