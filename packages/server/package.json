@@ -27,6 +27,7 @@
     "@anbiq/engine-claude-code": "workspace:*",
     "@anbiq/github": "workspace:*",
     "@anbiq/runner-github-actions": "workspace:*",
+    "@anbiq/tap-discord": "workspace:*",
     "@anbiq/tap-slack": "workspace:*",
     "@anbiq/tap-telegram": "workspace:*",
     "@anbiq/tap-whatsapp-twilio": "workspace:*",

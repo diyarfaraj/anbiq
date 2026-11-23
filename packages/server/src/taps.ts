@@ -1,4 +1,5 @@
 import type { ConversationMemory, Tap } from '@anbiq/core';
+import { DiscordTap } from '@anbiq/tap-discord';
 import { SlackTap } from '@anbiq/tap-slack';
 import { TelegramTap } from '@anbiq/tap-telegram';
 import { WhatsAppTap } from '@anbiq/tap-whatsapp-twilio';
@@ -76,6 +77,22 @@ export const TAPS = {
         chats: options.chats,
         memory,
         ...(options.bot_username ? { botUsername: options.bot_username } : {}),
+        ...io,
+      }),
+  }),
+  discord: define({
+    secrets: ['DISCORD_PUBLIC_KEY', 'DISCORD_BOT_TOKEN'],
+    options: z
+      .object({
+        channels: z.array(z.string().regex(/^\d+$/, 'must be numeric channel IDs')).min(1),
+      })
+      .strict(),
+    build: (options, { env, memory, io }) =>
+      new DiscordTap({
+        publicKey: env.DISCORD_PUBLIC_KEY!.trim(),
+        botToken: env.DISCORD_BOT_TOKEN!,
+        channels: options.channels,
+        memory,
         ...io,
       }),
   }),
