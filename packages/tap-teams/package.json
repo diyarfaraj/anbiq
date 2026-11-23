@@ -1,0 +1,27 @@
+{
+  "name": "@anbiq/tap-teams",
+  "version": "0.0.0",
+  "description": "Microsoft Teams tap for Anbiq, through the Bot Framework.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anbiq/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@anbiq/testkit": "workspace:*"
+  }
+}

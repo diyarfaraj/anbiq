@@ -29,6 +29,7 @@
     "@anbiq/runner-github-actions": "workspace:*",
     "@anbiq/tap-discord": "workspace:*",
     "@anbiq/tap-slack": "workspace:*",
+    "@anbiq/tap-teams": "workspace:*",
     "@anbiq/tap-telegram": "workspace:*",
     "@anbiq/tap-whatsapp-twilio": "workspace:*",
     "zod": "^4.6.7"

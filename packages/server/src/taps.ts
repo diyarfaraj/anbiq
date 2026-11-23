@@ -1,6 +1,7 @@
 import type { ConversationMemory, Tap } from '@anbiq/core';
 import { DiscordTap } from '@anbiq/tap-discord';
 import { SlackTap } from '@anbiq/tap-slack';
+import { TeamsTap } from '@anbiq/tap-teams';
 import { TelegramTap } from '@anbiq/tap-telegram';
 import { WhatsAppTap } from '@anbiq/tap-whatsapp-twilio';
 import { z } from 'zod';
@@ -91,6 +92,32 @@ export const TAPS = {
       new DiscordTap({
         publicKey: env.DISCORD_PUBLIC_KEY!.trim(),
         botToken: env.DISCORD_BOT_TOKEN!,
+        channels: options.channels,
+        memory,
+        ...io,
+      }),
+  }),
+  teams: define({
+    secrets: ['TEAMS_APP_ID', 'TEAMS_APP_PASSWORD', 'TEAMS_TENANT_ID'],
+    options: z
+      .object({
+        channels: z
+          .array(
+            z
+              .string()
+              .regex(
+                /^19:.+@thread\.(tacv2|skype)$/,
+                'must be Teams channel IDs (19:…@thread.tacv2)',
+              ),
+          )
+          .min(1),
+      })
+      .strict(),
+    build: (options, { env, memory, io }) =>
+      new TeamsTap({
+        appId: env.TEAMS_APP_ID!.trim(),
+        appPassword: env.TEAMS_APP_PASSWORD!,
+        tenantId: env.TEAMS_TENANT_ID!.trim(),
         channels: options.channels,
         memory,
         ...io,
