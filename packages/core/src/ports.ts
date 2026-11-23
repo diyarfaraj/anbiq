@@ -70,6 +70,8 @@ export interface Tap {
    * Returns null when the request is not a handshake.
    */
   handshake?(request: InboundHttpRequest): Promise<HttpResponse | null>;
+  /** The response the platform expects after a handled webhook. Defaults to an empty 200. */
+  readonly acknowledgement?: HttpResponse;
 }
 
 // ── Tracker and git host ────────────────────────────────────────────────
