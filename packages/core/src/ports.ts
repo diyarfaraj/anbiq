@@ -131,6 +131,8 @@ export interface EngineInvocation {
   engine: string;
   prompt: string;
   allowedTools: string[];
+  /** Tools the agent may never use, even if an allowed pattern would match. */
+  deniedTools?: string[];
   maxTurns: number;
   timeoutMinutes: number;
   model?: string;
@@ -141,6 +143,8 @@ export interface AgentEngine {
   prepare(input: {
     stage: CrewStage;
     request: string;
+    /** The acceptance criteria the spec crew wrote. Present from the build stage on. */
+    spec?: string;
     feedback?: string;
     config: AnbiqConfig;
   }): EngineInvocation;
@@ -198,6 +202,8 @@ export interface JobRecord extends Job {
   bounces: number;
   /** The crew stage to resume when a blocked job gets an answer. */
   resumeStage?: CrewStage;
+  /** The acceptance criteria from the spec crew, handed to every later crew. */
+  spec?: string;
 }
 
 export interface JobStore {

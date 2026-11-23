@@ -1,0 +1,202 @@
+# Anbiq crew run. Copy this file to .github/workflows/anbiq-run.yml in the repository the factory works on.
+#
+# Two jobs, on purpose:
+#   crew     runs the agent with a read-only GITHUB_TOKEN and no factory secrets. Its commits leave the job
+#            only as a git bundle artifact.
+#   publish  has write access and the callback secret, but runs no agent: it pushes the bundle to the job's
+#            branch and reports the result to the factory.
+#
+# Values from inputs and from the agent are only ever passed through environment variables, never
+# interpolated into shell scripts.
+
+name: anbiq run
+run-name: anbiq ${{ inputs.run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Anbiq run ID
+        required: true
+        type: string
+      job_id:
+        description: Anbiq job ID
+        required: true
+        type: string
+      stage:
+        description: Crew stage
+        required: true
+        type: choice
+        options: [spec, build, qa, review]
+      branch:
+        description: The job branch
+        required: true
+        type: string
+      invocation:
+        description: Base64 JSON prepared by the agent engine
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: anbiq-${{ inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  crew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      RUN_ID: ${{ inputs.run_id }}
+      BRANCH: ${{ inputs.branch }}
+      INVOCATION: ${{ inputs.invocation }}
+    steps:
+      - name: Check the inputs
+        id: inputs
+        run: |
+          [[ "$RUN_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]] || { echo "::error::invalid run ID"; exit 1; }
+          [[ "$BRANCH" =~ ^anbiq/[a-z0-9]{1,40}$ ]] || { echo "::error::refusing branch $BRANCH"; exit 1; }
+          printf '%s' "$INVOCATION" | base64 -d > "$RUNNER_TEMP/invocation.json"
+          jq -e '(.prompt | type == "string") and (.allowedTools | type == "array") and (.maxTurns | type == "number")' \
+            "$RUNNER_TEMP/invocation.json" > /dev/null
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare the job branch
+        id: prepare
+        run: |
+          git config user.name "anbiq"
+          git config user.email "anbiq@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            git fetch origin "$BRANCH"
+            git checkout -B "$BRANCH" FETCH_HEAD
+          else
+            git checkout -b "$BRANCH"
+          fi
+          echo "start=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mkdir -p .anbiq
+          echo ".anbiq/" >> .git/info/exclude
+
+          inv="$RUNNER_TEMP/invocation.json"
+          delimiter="ANBIQ_$(openssl rand -hex 16)"
+          {
+            echo "prompt<<$delimiter"
+            jq -r '.prompt' "$inv"
+            echo "$delimiter"
+            echo "settings=$(jq -c '{permissions: {allow: .allowedTools, deny: (.deniedTools // [])}}' "$inv")"
+            echo "args=--max-turns $(jq -r '.maxTurns' "$inv")$(jq -r 'if .model then " --model " + .model else "" end' "$inv")"
+            echo "timeout=$(jq -r '.timeoutMinutes // 60' "$inv")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run the crew
+        id: crew
+        uses: anthropics/claude-code-action@v1
+        timeout-minutes: ${{ fromJSON(steps.prepare.outputs.timeout) }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          settings: ${{ steps.prepare.outputs.settings }}
+          claude_args: ${{ steps.prepare.outputs.args }}
+
+      - name: Package the result
+        if: always()
+        env:
+          START: ${{ steps.prepare.outputs.start }}
+          EXECUTION_FILE: ${{ steps.crew.outputs.execution_file }}
+        run: |
+          out="$RUNNER_TEMP/out"
+          mkdir -p "$out"
+          if [ -f .anbiq/result.json ] && jq -e '.outcome and .summary' .anbiq/result.json > /dev/null 2>&1; then
+            cp .anbiq/result.json "$out/result.json"
+          else
+            echo '{"outcome":"failed","summary":"The crew finished without reporting a result."}' > "$out/result.json"
+          fi
+          cost=0
+          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
+            cost=$(jq '[.[]? | select(.type == "result") | .total_cost_usd // 0] | add // 0' "$EXECUTION_FILE" 2> /dev/null || echo 0)
+          fi
+          head=$(git rev-parse HEAD)
+          jq -n --arg start "${START:-}" --arg head "$head" --argjson cost "${cost:-0}" \
+            '{start: $start, head: $head, costUsd: $cost}' > "$out/meta.json"
+          if [ -n "$START" ] && [ "$head" != "$START" ]; then
+            git branch -f anbiq-crew HEAD
+            git bundle create "$out/crew.bundle" anbiq-crew "^$START"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: anbiq-${{ inputs.run_id }}
+          path: ${{ runner.temp }}/out
+          retention-days: 3
+
+  publish:
+    needs: crew
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RUN_ID: ${{ inputs.run_id }}
+      JOB_ID: ${{ inputs.job_id }}
+      STAGE: ${{ inputs.stage }}
+      BRANCH: ${{ inputs.branch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: anbiq-${{ inputs.run_id }}
+          path: ${{ runner.temp }}/crew
+
+      - name: Push the crew's commits
+        id: push
+        run: |
+          [[ "$BRANCH" =~ ^anbiq/[a-z0-9]{1,40}$ ]] || { echo "::error::refusing branch $BRANCH"; exit 1; }
+          crew="$RUNNER_TEMP/crew"
+          head=""
+          if [ -f "$crew/crew.bundle" ]; then
+            git fetch "$crew/crew.bundle" "anbiq-crew:refs/anbiq/crew"
+            git push origin "refs/anbiq/crew:refs/heads/$BRANCH"
+            head=$(git rev-parse refs/anbiq/crew)
+          elif [ -f "$crew/meta.json" ]; then
+            head=$(jq -r '.head // empty' "$crew/meta.json")
+          fi
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+
+      - name: Report to the factory
+        if: always()
+        env:
+          HEAD_SHA: ${{ steps.push.outputs.head }}
+          CALLBACK_URL: ${{ vars.ANBIQ_CALLBACK_URL }}
+          CALLBACK_SECRET: ${{ secrets.ANBIQ_CALLBACK_SECRET }}
+        run: |
+          crew="$RUNNER_TEMP/crew"
+          result="$crew/result.json"
+          [ -f "$result" ] || echo '{"outcome":"failed","summary":"The crew job did not finish."}' > "$result"
+          cost=$(jq '.costUsd // 0' "$crew/meta.json" 2> /dev/null || echo 0)
+          body=$(jq -c \
+            --arg runId "$RUN_ID" --arg jobId "$JOB_ID" --arg stage "$STAGE" \
+            --arg headSha "$HEAD_SHA" --argjson cost "${cost:-0}" \
+            '{runId: $runId, jobId: $jobId, stage: $stage, outcome: .outcome, summary: .summary,
+              question: .question, headSha: (if $headSha == "" then null else $headSha end), costUsd: $cost}' \
+            "$result")
+          timestamp=$(date +%s)
+          signature=$(printf '%s.%s' "$timestamp" "$body" | openssl dgst -sha256 -hmac "$CALLBACK_SECRET" -hex | awk '{print $NF}')
+          curl --fail --silent --show-error --max-time 30 \
+            -X POST "$CALLBACK_URL/runs/$RUN_ID" \
+            -H "content-type: application/json" \
+            -H "x-anbiq-timestamp: $timestamp" \
+            -H "x-anbiq-signature: sha256=$signature" \
+            --data "$body"

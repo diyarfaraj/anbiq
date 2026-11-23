@@ -1,0 +1,24 @@
+{
+  "name": "@anbiq/engine-claude-code",
+  "version": "0.0.0",
+  "description": "Claude Code agent engine for Anbiq: the crew instructions, prompt and per-stage tool permissions.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anbiq/core": "workspace:*"
+  }
+}

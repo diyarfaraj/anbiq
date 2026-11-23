@@ -39,6 +39,12 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  packages/engine-claude-code:
+    dependencies:
+      '@anbiq/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/github:
     dependencies:
       '@anbiq/core':
@@ -48,6 +54,25 @@ importers:
       '@anbiq/testkit':
         specifier: workspace:*
         version: link:../testkit
+
+  packages/runner-github-actions:
+    dependencies:
+      '@anbiq/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anbiq/github':
+        specifier: workspace:*
+        version: link:../github
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@anbiq/testkit':
+        specifier: workspace:*
+        version: link:../testkit
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
 
   packages/tap-slack:
     dependencies:
