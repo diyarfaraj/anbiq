@@ -271,6 +271,20 @@ describe('revisions and failures', () => {
     expect(f.runner.last().stage).toBe('build');
   });
 
+  it('handles a webhook delivered twice only once', async () => {
+    const f = setup();
+    const request = f.tap.signedRequest({
+      userId: OWNER,
+      channel: 'C1',
+      thread: 'T1',
+      text: 'Add a button',
+    });
+    await f.factory.handleHttp('slack', request);
+    await f.factory.handleHttp('slack', request);
+    expect(f.tracker.issues.size).toBe(1);
+    expect(f.runner.started).toHaveLength(1);
+  });
+
   it('tells people to use a command when they write in an active job thread', async () => {
     const f = setup();
     await f.say(OWNER, 'Add a button');

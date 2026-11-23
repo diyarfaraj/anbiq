@@ -29,6 +29,7 @@ export type {
   FactoryEvent,
   FactoryEventKind,
   GitHost,
+  HttpResponse,
   InboundHttpRequest,
   InboundMessage,
   IssueRef,
