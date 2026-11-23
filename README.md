@@ -38,14 +38,14 @@ A still has four parts, and so does Anbiq:
 
 ## Modules
 
-| Slot               | First implementation                            | Planned                                          |
-| ------------------ | ----------------------------------------------- | ------------------------------------------------ |
-| Tap (chat channel) | Slack, WhatsApp (via Twilio), Telegram, Discord | Microsoft Teams, email; iMessage as experimental |
-| Tracker            | GitHub Issues                                   | Linear, Jira                                     |
-| Git host           | GitHub                                          | GitLab                                           |
-| Runner             | GitHub Actions                                  | self-hosted machine, hosted agent sandboxes      |
-| Agent engine       | Claude Code                                     | other coding agents                              |
-| Event sink         | Anbiq live board                                | OpenTelemetry                                    |
+| Slot               | First implementation                                             | Planned                                     |
+| ------------------ | ---------------------------------------------------------------- | ------------------------------------------- |
+| Tap (chat channel) | Slack, WhatsApp (via Twilio), Telegram, Discord, Microsoft Teams | email; iMessage as experimental             |
+| Tracker            | GitHub Issues                                                    | Linear, Jira                                |
+| Git host           | GitHub                                                           | GitLab                                      |
+| Runner             | GitHub Actions                                                   | self-hosted machine, hosted agent sandboxes |
+| Agent engine       | Claude Code                                                      | other coding agents                         |
+| Event sink         | Anbiq live board                                                 | OpenTelemetry                               |
 
 See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lifecycle and the security model, and [docs/crews.md](docs/crews.md) for what each crew does.
 

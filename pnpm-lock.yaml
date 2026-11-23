@@ -94,6 +94,9 @@ importers:
       '@anbiq/tap-slack':
         specifier: workspace:*
         version: link:../tap-slack
+      '@anbiq/tap-teams':
+        specifier: workspace:*
+        version: link:../tap-teams
       '@anbiq/tap-telegram':
         specifier: workspace:*
         version: link:../tap-telegram
@@ -119,6 +122,16 @@ importers:
         version: link:../testkit
 
   packages/tap-slack:
+    dependencies:
+      '@anbiq/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@anbiq/testkit':
+        specifier: workspace:*
+        version: link:../testkit
+
+  packages/tap-teams:
     dependencies:
       '@anbiq/core':
         specifier: workspace:*

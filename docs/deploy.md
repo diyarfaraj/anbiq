@@ -47,6 +47,9 @@ The full schema is in [architecture.md](architecture.md). The server refuses to 
 | `TELEGRAM_SECRET_TOKEN`      | with Telegram       | The `secret_token` given to `setWebhook`                               |
 | `DISCORD_PUBLIC_KEY`         | with Discord        | The application's public key (hex)                                     |
 | `DISCORD_BOT_TOKEN`          | with Discord        | The bot token                                                          |
+| `TEAMS_APP_ID`               | with Teams          | The Azure Bot's Microsoft App ID                                       |
+| `TEAMS_APP_PASSWORD`         | with Teams          | A client secret for that app                                           |
+| `TEAMS_TENANT_ID`            | with Teams          | Your Microsoft Entra tenant ID                                         |
 | `ANBIQ_BASE_BRANCH`          | no, `main`          | The branch pull requests target and the workflow is read from          |
 | `ANBIQ_WORKFLOW`             | no, `anbiq-run.yml` | The crew workflow file name                                            |
 | `PORT`                       | no, `8080`          | Port to listen on                                                      |
