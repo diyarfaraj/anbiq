@@ -53,6 +53,13 @@ See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lif
 
 Anbiq runs as one small container with a SQLite file. [docs/deploy.md](docs/deploy.md) walks through the GitHub App, the crew workflow, `anbiq.yml`, the environment and the webhook URLs.
 
+Every module is also published on npm under [`@anbiq`](https://www.npmjs.com/org/anbiq):
+
+```sh
+npm install --global @anbiq/server   # the server, as the anbiq-server command
+npm install @anbiq/core @anbiq/tap-slack @anbiq/github   # or build your own factory from the parts
+```
+
 ## Roadmap
 
 The roadmap lives in [issues](../../issues). In short:

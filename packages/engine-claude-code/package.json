@@ -1,9 +1,24 @@
 {
   "name": "@anbiq/engine-claude-code",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Claude Code agent engine for Anbiq: the crew instructions, prompt and per-stage tool permissions.",
-  "private": true,
   "license": "MIT",
+  "author": "Diyar Faraj",
+  "homepage": "https://github.com/diyarfaraj/anbiq/tree/main/packages/engine-claude-code#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diyarfaraj/anbiq.git",
+    "directory": "packages/engine-claude-code"
+  },
+  "bugs": "https://github.com/diyarfaraj/anbiq/issues",
+  "keywords": [
+    "anbiq",
+    "claude-code",
+    "agents"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -20,5 +35,8 @@
   },
   "dependencies": {
     "@anbiq/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

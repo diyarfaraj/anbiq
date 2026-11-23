@@ -1,9 +1,26 @@
 {
   "name": "@anbiq/github",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "GitHub tracker and git host for Anbiq: jobs as issues, work as pull requests, authenticated as a GitHub App.",
-  "private": true,
   "license": "MIT",
+  "author": "Diyar Faraj",
+  "homepage": "https://github.com/diyarfaraj/anbiq/tree/main/packages/github#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diyarfaraj/anbiq.git",
+    "directory": "packages/github"
+  },
+  "bugs": "https://github.com/diyarfaraj/anbiq/issues",
+  "keywords": [
+    "anbiq",
+    "github",
+    "github-app",
+    "issues",
+    "pull-requests"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -23,5 +40,8 @@
   },
   "devDependencies": {
     "@anbiq/testkit": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
