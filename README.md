@@ -1,8 +1,10 @@
 # Anbiq
 
-**Anbiq** (an-BEEK), from Arabic _al-anbīq_ (الأنبيق), the alchemist's still that became the "alembic".
+<p align="center">
+  <img src="docs/assets/anbiq-banner.jpg" alt="Anbiq: a copper alembic turning chat messages into a pull request. Distill requests into shipped code." width="100%">
+</p>
 
-_Distill requests into shipped code._
+**Anbiq** (an-BEEK), from Arabic _al-anbīq_ (الأنبيق), the alchemist's still that became the "alembic".
 
 Anbiq is an open-source software factory. You send a request from the chat app you already use (Slack, Microsoft Teams, WhatsApp, and more). Anbiq turns it into a tracked job, and coding agents plan, build, test and review it. You get a pull request back in the same conversation. Nothing is merged or deployed until you say so.
 
