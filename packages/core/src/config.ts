@@ -33,6 +33,8 @@ const policySchema = z
     confirm_commands: z.array(text).default([]),
     deploy_environments: z.array(text).min(1).default(['production']),
     max_revisions: z.number().int().min(0).default(3),
+    /** How many times QA or review may send work back to build before a person takes over. */
+    max_bounces: z.number().int().min(0).default(3),
   })
   .strict();
 

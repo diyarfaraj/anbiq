@@ -18,3 +18,33 @@ export type { Decision, PolicyContext, PullRequestState } from './policy.js';
 
 export { canAcceptJob, canStartRun } from './budget.js';
 export type { BudgetCheck, Usage } from './budget.js';
+
+export { HeadMovedError } from './ports.js';
+export type {
+  AgentEngine,
+  CrewStage,
+  Deployer,
+  EngineInvocation,
+  EventSink,
+  FactoryEvent,
+  FactoryEventKind,
+  GitHost,
+  InboundHttpRequest,
+  InboundMessage,
+  IssueRef,
+  JobRecord,
+  JobStore,
+  OutboundMessage,
+  PullRequestRef,
+  RunRef,
+  RunResult,
+  RunSpec,
+  Runner,
+  Tap,
+  TapCapabilities,
+  ThreadRef,
+  Tracker,
+} from './ports.js';
+
+export { createFactory } from './factory.js';
+export type { Factory, FactoryDeps } from './factory.js';
