@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Factory, HttpResponse } from '@anbiq/core';
+import type { Factory, FactoryEvent, HttpResponse } from '@anbiq/core';
 import { parseCallback, verifyCallback } from '@anbiq/runner-github-actions';
+import type { createBoard } from './board.js';
+import { factoryEventSchema, type SqliteEventSink } from './events.js';
 import { errorFields, type Logger } from './log.js';
 import type { SerialQueue } from './queue.js';
 
@@ -13,6 +15,9 @@ export interface HandlerOptions {
   callbackSecret: string;
   logger: Logger;
   now?: () => Date;
+  board?: ReturnType<typeof createBoard>;
+  /** Accepts signed events from factories running elsewhere. */
+  events?: { sink: SqliteEventSink; secret: string };
 }
 
 class BodyTooLargeError extends Error {}
@@ -65,11 +70,52 @@ export function createHandler(options: HandlerOptions) {
       return { status: 200 };
     }
 
+    if (request.method === 'POST' && path === '/events' && options.events) {
+      const body = await readBody(request);
+      const verified = verifyCallback({
+        secret: options.events.secret,
+        body,
+        timestamp: header(request, 'x-anbiq-timestamp'),
+        signature: header(request, 'x-anbiq-signature'),
+        ...(options.now ? { now: options.now() } : {}),
+      });
+      if (!verified) return { status: 401 };
+      let raw: unknown;
+      try {
+        raw = JSON.parse(body);
+      } catch {
+        return { status: 400 };
+      }
+      const parsed = factoryEventSchema.safeParse(raw);
+      if (!parsed.success) return { status: 400 };
+      await options.events.sink.emit(parsed.data as FactoryEvent);
+      return { status: 202 };
+    }
+
     return { status: 404 };
   }
 
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const started = Date.now();
+    const path = new URL(request.url ?? '/', 'http://anbiq.local').pathname;
+    if (options.board && (path === '/board' || path.startsWith('/board/'))) {
+      try {
+        await options.board(request, response, path);
+      } catch (error) {
+        logger.log('error', 'board request failed', errorFields(error));
+        if (!response.headersSent) response.writeHead(500);
+        response.end();
+      }
+      if (path !== '/board/api/stream') {
+        logger.log('info', 'request', {
+          method: request.method,
+          path,
+          status: response.statusCode,
+          ms: Date.now() - started,
+        });
+      }
+      return;
+    }
     let result: HttpResponse;
     try {
       result = await route(request);

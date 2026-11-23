@@ -6,6 +6,7 @@ import { GitHubActionsRunner } from '@anbiq/runner-github-actions';
 import { SlackTap } from '@anbiq/tap-slack';
 import { WhatsAppTap } from '@anbiq/tap-whatsapp-twilio';
 import { z } from 'zod';
+import { SqliteEventSink } from './events.js';
 import type { Logger } from './log.js';
 import { SerialQueue } from './queue.js';
 import { SqliteConversationMemory, SqliteDatabase, SqliteJobStore } from './sqlite.js';
@@ -32,6 +33,10 @@ const envSchema = z.object({
   GITHUB_APP_INSTALLATION_ID: required,
   ANBIQ_BASE_BRANCH: required.default('main'),
   ANBIQ_WORKFLOW: required.default('anbiq-run.yml'),
+  /** Turns on the board at /board. */
+  ANBIQ_BOARD_PASSWORD: z.string().min(12, 'must be at least 12 characters').optional(),
+  /** Turns on POST /events for factories running elsewhere. */
+  ANBIQ_EVENTS_SECRET: z.string().min(32, 'must be at least 32 characters').optional(),
 });
 
 export type Settings = z.infer<typeof envSchema>;
@@ -56,6 +61,8 @@ export interface App {
   factory: Factory;
   queue: SerialQueue;
   database: SqliteDatabase;
+  store: SqliteJobStore;
+  events: SqliteEventSink;
   settings: Settings;
   config: AnbiqConfig;
 }
@@ -180,8 +187,11 @@ export function buildApp(
     });
   });
 
+  const store = new SqliteJobStore(database, options.now ? { now: options.now } : {});
+  const events = new SqliteEventSink(database);
   const factory = createFactory({
     config,
+    events: [events],
     taps,
     tracker: new GitHubTracker(repository),
     gitHost: new GitHubGitHost({ ...repository, baseBranch: settings.ANBIQ_BASE_BRANCH }),
@@ -191,10 +201,10 @@ export function buildApp(
       ref: settings.ANBIQ_BASE_BRANCH,
     }),
     engine: new ClaudeCodeEngine(),
-    store: new SqliteJobStore(database, options.now ? { now: options.now } : {}),
+    store,
     defer: (task) => queue.defer(task, 'message'),
     ...(options.now ? { now: options.now } : {}),
   });
 
-  return { factory, queue, database, settings, config };
+  return { factory, queue, database, store, events, settings, config };
 }
