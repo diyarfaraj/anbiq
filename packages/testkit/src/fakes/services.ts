@@ -130,11 +130,17 @@ export class FakeRunner implements Runner {
 export class FakeEngine implements AgentEngine {
   readonly id = 'fake-engine';
 
-  prepare(input: { stage: CrewStage; request: string; feedback?: string }): EngineInvocation {
+  prepare(input: {
+    stage: CrewStage;
+    request: string;
+    spec?: string;
+    feedback?: string;
+  }): EngineInvocation {
+    const spec = input.spec ? `\nSpec: ${input.spec}` : '';
     const feedback = input.feedback ? `\nFeedback: ${input.feedback}` : '';
     return {
       engine: this.id,
-      prompt: `[${input.stage}] ${input.request}${feedback}`,
+      prompt: `[${input.stage}] ${input.request}${spec}${feedback}`,
       allowedTools: ['read', 'edit', 'test'],
       maxTurns: 10,
       timeoutMinutes: 10,

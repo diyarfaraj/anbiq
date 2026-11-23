@@ -148,6 +148,17 @@ describe('a job from request to production', () => {
     );
   });
 
+  it('hands the acceptance criteria from the spec crew to every later crew, and posts them on the issue', async () => {
+    const f = setup();
+    await f.say(OWNER, 'Add a copy-link button');
+    await f.finish('passed', { summary: '1. A button copies the booking link.' });
+    expect(f.runner.last().invocation.prompt).toContain(
+      'Spec: 1. A button copies the booking link.',
+    );
+    const issue = [...f.tracker.issues.values()][0]!;
+    expect(issue.comments.at(-1)).toContain('1. A button copies the booking link.');
+  });
+
   it('passes the request to every crew and only opens one pull request', async () => {
     const f = setup();
     await f.toApproval();

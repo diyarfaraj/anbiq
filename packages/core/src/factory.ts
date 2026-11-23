@@ -113,11 +113,13 @@ export function createFactory(deps: FactoryDeps): Factory {
       return false;
     }
 
-    const invocation = engine.prepare(
-      feedback === undefined
-        ? { stage, request: current.request, config }
-        : { stage, request: current.request, feedback, config },
-    );
+    const invocation = engine.prepare({
+      stage,
+      request: current.request,
+      config,
+      ...(current.spec === undefined ? {} : { spec: current.spec }),
+      ...(feedback === undefined ? {} : { feedback }),
+    });
     const run = await runner.start({
       runId,
       jobId: current.id,
@@ -518,9 +520,13 @@ export function createFactory(deps: FactoryDeps): Factory {
 
   async function onPassed(job: JobRecord, result: RunResult): Promise<void> {
     switch (result.stage) {
-      case 'spec':
-        await startStage(job, 'build');
+      case 'spec': {
+        const specified = { ...job, spec: result.summary };
+        if (job.issue)
+          await tracker.comment(job.issue, `Acceptance criteria:\n\n${result.summary}`);
+        await startStage(specified, 'build');
         return;
+      }
       case 'build': {
         let current = job;
         if (!current.pullRequest) {
