@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createFactory, parseConfig } from '@anbiq/core';
+import { chunkText, createFactory, parseConfig } from '@anbiq/core';
 import { FakeEngine, FakeGitHost, FakeRunner, FakeTracker, MemoryJobStore } from '@anbiq/testkit';
-import {
-  InMemoryConversationMemory,
-  MESSAGE_LIMIT,
-  WhatsAppTap,
-  chunk,
-  renderText,
-} from './index.js';
+import { InMemoryConversationMemory, MESSAGE_LIMIT, WhatsAppTap, renderText } from './index.js';
 import {
   AUTH_TOKEN,
   NOW,
@@ -180,7 +174,7 @@ describe('renderText', () => {
   });
 
   it('chunks prefer line breaks', () => {
-    expect(chunk('aaaa\nbbbb', 6)).toEqual(['aaaa', 'bbbb']);
+    expect(chunkText('aaaa\nbbbb', 6)).toEqual(['aaaa', 'bbbb']);
   });
 });
 

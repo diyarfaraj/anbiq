@@ -47,5 +47,13 @@ export type {
   Tracker,
 } from './ports.js';
 
+export {
+  InMemoryConversationMemory,
+  chunkText,
+  renderPlainText,
+  requestHeader,
+} from './tap-kit.js';
+export type { ConversationMemory } from './tap-kit.js';
+
 export { createFactory } from './factory.js';
 export type { Factory, FactoryDeps } from './factory.js';

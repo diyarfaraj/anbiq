@@ -1,32 +1,21 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type {
-  HttpResponse,
-  InboundHttpRequest,
-  InboundMessage,
-  OutboundMessage,
-  Tap,
-  TapCapabilities,
-  ThreadRef,
+import {
+  InMemoryConversationMemory,
+  chunkText,
+  renderPlainText,
+  requestHeader,
+  type ConversationMemory,
+  type HttpResponse,
+  type InboundHttpRequest,
+  type InboundMessage,
+  type OutboundMessage,
+  type Tap,
+  type TapCapabilities,
+  type ThreadRef,
 } from '@anbiq/core';
 
-/** Remembers which conversation a sent message belongs to, and when each person last wrote. */
-export interface ConversationMemory {
-  get(key: string): Promise<string | undefined>;
-  set(key: string, value: string): Promise<void>;
-}
-
-/** Fine for one process. Use a persistent store when the factory runs on more than one instance. */
-export class InMemoryConversationMemory implements ConversationMemory {
-  private readonly values = new Map<string, string>();
-
-  async get(key: string): Promise<string | undefined> {
-    return this.values.get(key);
-  }
-
-  async set(key: string, value: string): Promise<void> {
-    this.values.set(key, value);
-  }
-}
+export { InMemoryConversationMemory } from '@anbiq/core';
+export type { ConversationMemory } from '@anbiq/core';
 
 export interface WhatsAppTapOptions {
   accountSid: string;
@@ -77,7 +66,7 @@ export class WhatsAppTap implements Tap {
   }
 
   async verify(request: InboundHttpRequest): Promise<boolean> {
-    const signature = header(request, 'x-twilio-signature');
+    const signature = requestHeader(request, 'x-twilio-signature');
     if (!signature) return false;
     const params = new URLSearchParams(request.body);
     const signed = [...new Set(params.keys())]
@@ -123,7 +112,7 @@ export class WhatsAppTap implements Tap {
       });
       return;
     }
-    for (const piece of chunk(renderText(message), MESSAGE_LIMIT)) {
+    for (const piece of chunkText(renderText(message), MESSAGE_LIMIT)) {
       await this.post(thread, { Body: piece });
     }
   }
@@ -162,39 +151,5 @@ export class WhatsAppTap implements Tap {
 
 /** Plain text with WhatsApp's light formatting. Suggested replies become instructions. */
 export function renderText(message: OutboundMessage): string {
-  const parts = [`*${message.title}*`];
-  if (message.body) parts.push(message.body);
-  if (message.fields && message.fields.length > 0) {
-    parts.push(message.fields.map((field) => `${field.label}: ${field.value}`).join('\n'));
-  }
-  if (message.links && message.links.length > 0) {
-    parts.push(message.links.map((link) => `${link.label}: ${link.url}`).join('\n'));
-  }
-  if (message.actions && message.actions.length > 0) {
-    const replies = message.actions
-      .map((action) => action.command.trim() || action.label)
-      .join(' or ');
-    parts.push(`Reply to this message with: ${replies}`);
-  }
-  return parts.join('\n\n');
-}
-
-export function chunk(text: string, limit: number): string[] {
-  const pieces: string[] = [];
-  let rest = text;
-  while (rest.length > limit) {
-    const cut = rest.lastIndexOf('\n', limit);
-    const at = cut > limit / 2 ? cut : limit;
-    pieces.push(rest.slice(0, at));
-    rest = rest.slice(at).replace(/^\n/, '');
-  }
-  if (rest.length > 0) pieces.push(rest);
-  return pieces;
-}
-
-function header(request: InboundHttpRequest, name: string): string | undefined {
-  for (const [key, value] of Object.entries(request.headers)) {
-    if (key.toLowerCase() === name) return value;
-  }
-  return undefined;
+  return renderPlainText(message, { bold: (text) => `*${text}*` });
 }

@@ -3,13 +3,12 @@ import { createFactory, parseConfig, type AnbiqConfig, type Factory, type Tap } 
 import { ClaudeCodeEngine } from '@anbiq/engine-claude-code';
 import { GitHubAppAuth, GitHubGitHost, GitHubTracker, type TokenProvider } from '@anbiq/github';
 import { GitHubActionsRunner } from '@anbiq/runner-github-actions';
-import { SlackTap } from '@anbiq/tap-slack';
-import { WhatsAppTap } from '@anbiq/tap-whatsapp-twilio';
 import { z } from 'zod';
 import { SqliteEventSink } from './events.js';
 import type { Logger } from './log.js';
 import { SerialQueue } from './queue.js';
 import { SqliteConversationMemory, SqliteDatabase, SqliteJobStore } from './sqlite.js';
+import { buildTap, checkTap } from './taps.js';
 
 export class StartupError extends Error {
   constructor(readonly problems: string[]) {
@@ -40,14 +39,6 @@ const envSchema = z.object({
 });
 
 export type Settings = z.infer<typeof envSchema>;
-
-const slackOptions = z.object({ channels: z.array(required).min(1) }).strict();
-const whatsappOptions = z
-  .object({
-    from: z.string().regex(/^\+[1-9]\d{1,14}$/, 'must be an E.164 number'),
-    template_content_sid: required.optional(),
-  })
-  .strict();
 
 /** What each supported slot value is called in anbiq.yml. */
 const SUPPORTED = {
@@ -100,32 +91,10 @@ export function loadSettings(env: NodeJS.ProcessEnv): { settings: Settings; conf
       problems.push(`anbiq.yml ${slot} "${value}" is not supported; use ${supported.join(', ')}`);
     }
   }
-  for (const tap of Object.keys(config.taps)) {
-    if (!(tap in TAP_SECRETS)) {
-      problems.push(
-        `anbiq.yml taps.${tap} is not supported; use ${Object.keys(TAP_SECRETS).join(', ')}`,
-      );
-      continue;
-    }
-    for (const name of TAP_SECRETS[tap as keyof typeof TAP_SECRETS]) {
-      if (!env[name]?.trim()) problems.push(`${name} is required for the ${tap} tap`);
-    }
-    const schema = tap === 'slack' ? slackOptions : whatsappOptions;
-    const tapOptions = schema.safeParse(config.taps[tap]);
-    if (!tapOptions.success) {
-      for (const issue of tapOptions.error.issues) {
-        problems.push(`anbiq.yml taps.${tap}.${issue.path.join('.')} ${issue.message}`);
-      }
-    }
-  }
+  for (const [tap, raw] of Object.entries(config.taps)) problems.push(...checkTap(tap, raw, env));
   if (problems.length > 0) throw new StartupError(problems);
   return { settings, config };
 }
-
-const TAP_SECRETS = {
-  slack: ['SLACK_SIGNING_SECRET', 'SLACK_BOT_TOKEN'],
-  'whatsapp-twilio': ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'],
-} as const;
 
 export interface BuildOptions {
   logger: Logger;
@@ -163,29 +132,11 @@ export function buildApp(
     ...(options.fetch ? { fetch: options.fetch } : {}),
   };
 
-  const taps: Tap[] = Object.entries(config.taps).map(([id, raw]) => {
-    if (id === 'slack') {
-      const tapOptions = slackOptions.parse(raw);
-      return new SlackTap({
-        signingSecret: env.SLACK_SIGNING_SECRET!,
-        botToken: env.SLACK_BOT_TOKEN!,
-        channels: tapOptions.channels,
-        ...io,
-      });
-    }
-    const tapOptions = whatsappOptions.parse(raw);
-    return new WhatsAppTap({
-      accountSid: env.TWILIO_ACCOUNT_SID!,
-      authToken: env.TWILIO_AUTH_TOKEN!,
-      from: tapOptions.from,
-      webhookUrl: `${settings.ANBIQ_PUBLIC_URL.replace(/\/$/, '')}/taps/${id}`,
-      memory: new SqliteConversationMemory(database),
-      ...(tapOptions.template_content_sid
-        ? { templateContentSid: tapOptions.template_content_sid }
-        : {}),
-      ...io,
-    });
-  });
+  const memory = new SqliteConversationMemory(database);
+  const publicUrl = settings.ANBIQ_PUBLIC_URL.replace(/\/$/, '');
+  const taps: Tap[] = Object.entries(config.taps).map(([id, raw]) =>
+    buildTap(id, raw, { env, webhookUrl: `${publicUrl}/taps/${id}`, memory, io }),
+  );
 
   const store = new SqliteJobStore(database, options.now ? { now: options.now } : {});
   const events = new SqliteEventSink(database);
