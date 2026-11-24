@@ -8,6 +8,7 @@ import {
   type Tap,
 } from '@anbiq/core';
 import { ClaudeCodeEngine } from '@anbiq/engine-claude-code';
+import { OpenCodeEngine } from '@anbiq/engine-opencode';
 import { GitHubAppAuth, GitHubGitHost, GitHubTracker, type TokenProvider } from '@anbiq/github';
 import { GitHubActionsRunner } from '@anbiq/runner-github-actions';
 import { z } from 'zod';
@@ -51,8 +52,10 @@ export type Settings = z.infer<typeof envSchema>;
  * The agent engines a factory can run its crews on, by the ID used in anbiq.yml. A new engine
  * is added here, and as a step in the runner's workflow.
  */
-const ENGINES: Record<string, () => AgentEngine> = {
-  'claude-code': () => new ClaudeCodeEngine(),
+const ENGINES: Record<string, { create: () => AgentEngine; needsModel?: boolean }> = {
+  'claude-code': { create: () => new ClaudeCodeEngine() },
+  // OpenCode has no default provider, so the model must be named.
+  opencode: { create: () => new OpenCodeEngine(), needsModel: true },
 };
 
 /** What each supported slot value is called in anbiq.yml. */
@@ -105,6 +108,11 @@ export function loadSettings(env: NodeJS.ProcessEnv): { settings: Settings; conf
     if (!supported.includes(value)) {
       problems.push(`anbiq.yml ${slot} "${value}" is not supported; use ${supported.join(', ')}`);
     }
+  }
+  if (ENGINES[config.engine.id]?.needsModel && !config.engine.model) {
+    problems.push(
+      `anbiq.yml engine.model is required for the ${config.engine.id} engine, as provider/model`,
+    );
   }
   for (const [tap, raw] of Object.entries(config.taps)) problems.push(...checkTap(tap, raw, env));
   if (problems.length > 0) throw new StartupError(problems);
@@ -167,7 +175,7 @@ export function buildApp(
       ref: settings.ANBIQ_BASE_BRANCH,
     }),
     // loadSettings has already refused an engine that is not in the list.
-    engine: ENGINES[config.engine.id]!(),
+    engine: ENGINES[config.engine.id]!.create(),
     store,
     defer: (task) => queue.defer(task, 'message'),
     ...(options.now ? { now: options.now } : {}),

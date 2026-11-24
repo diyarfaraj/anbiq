@@ -209,9 +209,13 @@ describe('loadSettings', () => {
     const config = CONFIG.replace('runner: github-actions', 'runner: jenkins');
     const run = () => loadSettings(envWith({ SLACK_BOT_TOKEN: undefined }, config));
     expect(run).toThrow(/runner "jenkins" is not supported/);
+    const noModel = CONFIG.replace('id: claude-code', 'id: opencode');
+    expect(() => loadSettings(envWith({}, noModel))).toThrow(/engine\.model is required/);
+    const withModel = CONFIG.replace('id: claude-code', 'id: opencode, model: openai/some-model');
+    expect(loadSettings(envWith({}, withModel)).config.engine.id).toBe('opencode');
     const engine = CONFIG.replace('id: claude-code', 'id: some-other-agent');
     expect(() => loadSettings(envWith({}, engine))).toThrow(
-      /engine "some-other-agent" is not supported; use claude-code/,
+      /engine "some-other-agent" is not supported; use claude-code, opencode/,
     );
     expect(run).toThrow(/SLACK_BOT_TOKEN is required for the slack tap/);
     expect(() => loadSettings(envWith({}, 'project: acme'))).toThrow(/anbiq\.yml/);
