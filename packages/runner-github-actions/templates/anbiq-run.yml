@@ -70,14 +70,25 @@ jobs:
 
       - name: Prepare the job branch
         id: prepare
+        env:
+          # Read-only, and used for these two git commands only: it is never written to the git
+          # config, so the agent's git has no credentials.
+          READ_TOKEN: ${{ github.token }}
         run: |
           git config user.name "anbiq"
           git config user.email "anbiq@users.noreply.github.com"
-          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
-            git fetch origin "$BRANCH"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 -w0)"
+          status=0
+          git -c "http.extraheader=$auth" ls-remote --exit-code --heads origin "$BRANCH" > /dev/null || status=$?
+          if [ "$status" -eq 0 ]; then
+            git -c "http.extraheader=$auth" fetch origin "$BRANCH"
             git checkout -B "$BRANCH" FETCH_HEAD
-          else
+          elif [ "$status" -eq 2 ]; then
+            # No such branch yet: this is the job's first run.
             git checkout -b "$BRANCH"
+          else
+            echo "::error::could not read the job branch from the repository"
+            exit 1
           fi
           echo "start=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           mkdir -p .anbiq
