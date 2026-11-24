@@ -6,7 +6,7 @@ Runs each Anbiq crew as a GitHub Actions workflow in the repository the factory 
 
 1. Copy [`templates/anbiq-run.yml`](templates/anbiq-run.yml) to `.github/workflows/anbiq-run.yml` on the base branch.
 2. Add the secrets and variable under Settings → Secrets and variables → Actions:
-   - secret `ANTHROPIC_API_KEY`: the key the crews run on;
+   - secret `ANTHROPIC_API_KEY`: the key the crews run on. To run them on a Claude subscription instead, set the secret `CLAUDE_CODE_OAUTH_TOKEN` to the token printed by `claude setup-token`; when both are set, the subscription token is used;
    - secret `ANBIQ_CALLBACK_SECRET`: a long random string, the same one the factory is given;
    - variable `ANBIQ_CALLBACK_URL`: the factory's public base URL. Results are posted to `<url>/runs/<run id>`.
 3. Give the factory's GitHub App the **Actions: read and write** permission, so it can dispatch and cancel runs.
