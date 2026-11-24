@@ -45,6 +45,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/engine-opencode:
+    dependencies:
+      '@anbiq/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/github:
     dependencies:
       '@anbiq/core':
@@ -67,6 +73,9 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      '@anbiq/engine-opencode':
+        specifier: workspace:*
+        version: link:../engine-opencode
       '@anbiq/testkit':
         specifier: workspace:*
         version: link:../testkit
@@ -82,6 +91,9 @@ importers:
       '@anbiq/engine-claude-code':
         specifier: workspace:*
         version: link:../engine-claude-code
+      '@anbiq/engine-opencode':
+        specifier: workspace:*
+        version: link:../engine-opencode
       '@anbiq/github':
         specifier: workspace:*
         version: link:../github

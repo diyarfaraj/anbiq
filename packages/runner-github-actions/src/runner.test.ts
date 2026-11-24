@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
+import { OPENCODE_VERSION } from '@anbiq/engine-opencode';
 import { staticToken } from '@anbiq/github';
 import { describeRunnerConformance } from '@anbiq/testkit';
 import { parseCallback, signCallback, verifyCallback } from './callback.js';
@@ -241,13 +242,30 @@ describe('workflow template', () => {
     const steps = workflow.jobs.crew!.steps;
     const agents = steps.filter((step) => /^Run the crew/.test(step.name ?? ''));
     const engines = agents.map((step) => /^Run the crew \((.+)\)$/.exec(step.name ?? '')?.[1]);
-    expect(engines).toContain('claude-code');
+    expect(engines).toEqual(['claude-code', 'opencode']);
     for (const [index, step] of agents.entries()) {
       expect(step.if).toBe(`steps.prepare.outputs.engine == '${engines[index]}'`);
     }
     const refusal = steps.find((step) => /^Refuse an engine/.test(step.name ?? ''))!;
     expect(refusal.if).toContain(JSON.stringify(engines));
     expect(refusal.run).toContain('exit 1');
+  });
+
+  it('starts OpenCode with only the factory rules, and without approving what they leave open', () => {
+    const step = workflow.jobs.crew!.steps.find((s) => s.name === 'Run the crew (opencode)')!;
+    expect(step.env).toMatchObject({ OPENCODE_DISABLE_PROJECT_CONFIG: '1' });
+    expect(step.run).toContain('export OPENCODE_CONFIG="$RUNNER_TEMP/opencode.json"');
+    expect(step.run).toContain(`@opencode/cli@${OPENCODE_VERSION}`);
+    const commands = step.run!.split('\n').filter((line) => !line.trim().startsWith('#'));
+    expect(commands.join('\n')).not.toMatch(/--auto\b/);
+    expect(step.run).toContain('< /dev/null');
+  });
+
+  it('discards commits that change CI workflows, whatever the engine allowed', () => {
+    const step = workflow.jobs.crew!.steps.find((s) => s.name === 'Package the result')!;
+    const guard = step.run!.indexOf('-- .github/workflows');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(step.run!.indexOf('git bundle create'));
   });
 
   it('starts from no permissions at the workflow level', () => {

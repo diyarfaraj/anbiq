@@ -94,7 +94,7 @@ interface Runner {
 }
 
 interface AgentEngine {
-  id: string; // "claude-code", ...
+  id: string; // "claude-code", "opencode", ...
   prepare(input): EngineInvocation; // the prompt, the agent's settings, limits
 }
 ```

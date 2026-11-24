@@ -44,7 +44,7 @@ A still has four parts, and so does Anbiq:
 | Tracker            | GitHub Issues                                                    | Linear, Jira                                |
 | Git host           | GitHub                                                           | GitLab                                      |
 | Runner             | GitHub Actions                                                   | self-hosted machine, hosted agent sandboxes |
-| Agent engine       | Claude Code                                                      | other coding agents                         |
+| Agent engine       | Claude Code; OpenCode (OpenAI, Google, OpenRouter and others)    | other coding agents                         |
 | Event sink         | Anbiq live board                                                 | OpenTelemetry                               |
 
 See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lifecycle and the security model, and [docs/crews.md](docs/crews.md) for what each crew does.

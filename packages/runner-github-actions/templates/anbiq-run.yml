@@ -102,6 +102,7 @@ jobs:
             echo "$delimiter"
             echo "engine=$(jq -r '.engine | select(test("^[a-z0-9-]{1,40}$"))' "$inv")"
             echo "settings=$(jq -c '.settings' "$inv")"
+            echo "model=$(jq -r '.model // ""' "$inv")"
             echo "args=--max-turns $(jq -r '.maxTurns' "$inv")$(jq -r 'if .model then " --model " + .model else "" end' "$inv")"
             echo "timeout=$(jq -r '.timeoutMinutes // 60' "$inv")"
           } >> "$GITHUB_OUTPUT"
@@ -110,7 +111,7 @@ jobs:
       # own agent and its own secret. `settings` is that agent's configuration, with the crew's
       # permissions, as the factory prepared it.
       - name: Refuse an engine this workflow has no step for
-        if: ${{ !contains(fromJSON('["claude-code"]'), steps.prepare.outputs.engine) }}
+        if: ${{ !contains(fromJSON('["claude-code","opencode"]'), steps.prepare.outputs.engine) }}
         run: |
           echo "::error::this workflow has no step for the configured agent engine"
           exit 1
@@ -134,6 +135,45 @@ jobs:
           settings: ${{ steps.prepare.outputs.settings }}
           claude_args: ${{ steps.prepare.outputs.args }}
 
+      # OpenCode runs the crew on the provider named in the model ("provider/model"). Only the keys
+      # that are set as secrets reach it. The rules in `settings` are the only config it loads:
+      # config, agents and plugins inside the repository are switched off, so the repository cannot
+      # widen the crew's permissions.
+      - name: Run the crew (opencode)
+        id: opencode
+        if: steps.prepare.outputs.engine == 'opencode'
+        timeout-minutes: ${{ fromJSON(steps.prepare.outputs.timeout) }}
+        env:
+          PROMPT: ${{ steps.prepare.outputs.prompt }}
+          SETTINGS: ${{ steps.prepare.outputs.settings }}
+          MODEL: ${{ steps.prepare.outputs.model }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          OPENCODE_DISABLE_PROJECT_CONFIG: '1'
+          OPENCODE_DISABLE_AUTOUPDATE: '1'
+        run: |
+          [ -n "$MODEL" ] || { echo "::error::the opencode engine needs engine.model in anbiq.yml"; exit 1; }
+          # An unset secret arrives as an empty variable, which must not count as a key.
+          for key in OPENAI_API_KEY GEMINI_API_KEY OPENROUTER_API_KEY ANTHROPIC_API_KEY GROQ_API_KEY \
+            MISTRAL_API_KEY DEEPSEEK_API_KEY XAI_API_KEY; do
+            [ -n "${!key}" ] || unset "$key"
+          done
+          # The version the permission rules were checked against. Change it together with
+          # OPENCODE_VERSION in @anbiq/engine-opencode.
+          npm install --global --no-fund --no-audit @opencode/cli@2.4.1
+          printf '%s' "$SETTINGS" > "$RUNNER_TEMP/opencode.json"
+          export OPENCODE_CONFIG="$RUNNER_TEMP/opencode.json"
+          # Without --auto, a permission the rules do not settle is refused. Standard input is
+          # closed because the agent otherwise waits on it.
+          opencode run --standalone --format json --model "$MODEL" "$PROMPT" \
+            < /dev/null > "$RUNNER_TEMP/opencode.jsonl"
+
       - name: Package the result
         if: always()
         env:
@@ -151,11 +191,16 @@ jobs:
           cost=null
           if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
             cost=$(jq '[.[]? | select(.type == "result") | .total_cost_usd // 0] | add // 0' "$EXECUTION_FILE" 2> /dev/null || echo null)
+          elif [ -f "$RUNNER_TEMP/opencode.jsonl" ]; then
+            cost=$(jq -s '[.[] | select(.type == "step_finish") | .part.cost // 0] | add // 0' "$RUNNER_TEMP/opencode.jsonl" 2> /dev/null || echo null)
           fi
           head=$(git rev-parse HEAD)
           jq -n --arg start "${START:-}" --arg head "$head" --argjson cost "${cost:-null}" \
             '{start: $start, head: $head, costUsd: $cost}' > "$out/meta.json"
-          if [ -n "$START" ] && [ "$head" != "$START" ]; then
+          if [ -n "$START" ] && [ "$head" != "$START" ] && [ -n "$(git diff --name-only "$START" "$head" -- .github/workflows)" ]; then
+            # Whatever the agent's own rules let through, a crew never changes CI.
+            echo '{"outcome":"failed","summary":"The crew changed CI workflows, which no crew may do. Its commits were discarded."}' > "$out/result.json"
+          elif [ -n "$START" ] && [ "$head" != "$START" ]; then
             git branch -f anbiq-crew HEAD
             git bundle create "$out/crew.bundle" anbiq-crew "^$START"
           fi
