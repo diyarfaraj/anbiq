@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryConversationMemory } from '@anbiq/core';
-import { TelegramTap } from './index.js';
+import { HINT, TelegramTap } from './index.js';
 import { NOW, SECRET, fakeBotApi, textMessage, update } from './__fixtures__/telegram.js';
 
 const CHAT = '-1001';
@@ -61,7 +61,7 @@ describe('TelegramTap', () => {
   it('threads a conversation through replies to the factory and to the original request', async () => {
     const { tap, api } = setup();
     const request = await tap.parse(
-      update(textMessage({ userId: '1', chat: CHAT, text: 'Add a button', messageId: 10 })),
+      update(textMessage({ userId: '1', chat: CHAT, text: '/anbiq Add a button', messageId: 10 })),
     );
     expect(request?.thread).toEqual({ tap: 'telegram', channel: CHAT, thread: '10' });
 
@@ -82,9 +82,55 @@ describe('TelegramTap', () => {
     expect(status?.thread.thread).toBe('10');
 
     const unrelated = await tap.parse(
-      update(textMessage({ userId: '1', chat: CHAT, text: 'New idea', messageId: 20 })),
+      update(textMessage({ userId: '1', chat: CHAT, text: '/anbiq New idea', messageId: 20 })),
     );
     expect(unrelated?.thread.thread).toBe('20');
+  });
+
+  it('starts a job only from a message addressed to the bot', async () => {
+    const { tap, api } = setup();
+    for (const text of ['Hi', '/start', 'Add a button']) {
+      expect(await tap.parse(update(textMessage({ userId: '1', chat: CHAT, text })))).toBeNull();
+    }
+    expect(
+      await tap.parse(
+        update(textMessage({ userId: '1', chat: CHAT, text: 'merge', replyTo: 4242 })),
+      ),
+    ).toBeNull();
+    // Group chats stay quiet: the bot must not answer every message it can see.
+    expect(api.calls).toHaveLength(0);
+  });
+
+  it('explains how to make a request in a private chat', async () => {
+    const { tap, api } = setup();
+    const message = textMessage({
+      userId: '1',
+      chat: CHAT,
+      text: 'Hi',
+      messageId: 30,
+      chatType: 'private',
+    });
+    expect(await tap.parse(update(message))).toBeNull();
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]?.body).toMatchObject({
+      chat_id: CHAT,
+      text: HINT,
+      reply_parameters: { message_id: 30 },
+    });
+  });
+
+  it('does not fail when the hint cannot be sent', async () => {
+    const tap = new TelegramTap({
+      botToken: '123:abc',
+      secretToken: SECRET,
+      chats: [CHAT],
+      fetch: (() => Promise.reject(new Error('offline'))) as typeof fetch,
+    });
+    expect(
+      await tap.parse(
+        update(textMessage({ userId: '1', chat: CHAT, text: 'Hi', chatType: 'private' })),
+      ),
+    ).toBeNull();
   });
 
   it('splits long messages at the Telegram limit and shows suggested replies as text', async () => {

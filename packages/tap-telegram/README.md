@@ -28,8 +28,8 @@ people:
 
 ## How it behaves
 
-- **Conversations:** Telegram has no threads. A message that is not a reply starts a new job. To act on an existing job, reply to one of the factory's messages about it, or to the original request.
-- **Text:** a leading `/anbiq` or `@bot_username` is removed, so `/anbiq Add a button` is the request "Add a button".
+- **Requests:** a new job starts only from a message addressed to the bot: `/anbiq Add a button` or `@bot_username add a button`. The request is the text after the command or mention. Other messages never become jobs; in a private chat the bot answers them with a short reminder of how to make a request, and in a group it stays silent.
+- **Conversations:** Telegram has no threads. To act on an existing job, reply to one of the factory's messages about it, or to the original request.
 - **Messages** over 4096 characters are split. Suggested replies are shown as text ("Reply to this message with: merge or revise: …").
 - **Ignored:** edits, channel posts, messages from bots, and chats that are not listed.
 
