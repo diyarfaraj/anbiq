@@ -173,7 +173,7 @@ export function createDemo(options: DemoOptions): Demo {
       return {
         engine: 'demo',
         prompt: input.request,
-        allowedTools: [],
+        settings: {},
         maxTurns: 1,
         timeoutMinutes: 1,
       };

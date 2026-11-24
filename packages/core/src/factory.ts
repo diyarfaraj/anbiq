@@ -586,7 +586,7 @@ export function createFactory(deps: FactoryDeps): Factory {
     // Ignore results from runs that were cancelled or replaced: only the active run may move a job.
     if (!found?.activeRun || found.activeRun.id !== result.runId) return;
 
-    await store.recordCost(found.id, result.costUsd, now());
+    if (result.costUsd !== undefined) await store.recordCost(found.id, result.costUsd, now());
     if (found.issue) await tracker.release(found.issue, result.runId);
     const job: JobRecord = { ...found };
     delete job.activeRun;
@@ -599,7 +599,7 @@ export function createFactory(deps: FactoryDeps): Factory {
       stage: result.stage,
       actor: { type: 'crew', role: result.stage, run: result.runId },
       summary: `${result.stage} ${result.outcome}: ${result.summary}`,
-      costUsd: result.costUsd,
+      ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
     });
 
     if (result.outcome === 'needs-input') {
@@ -781,7 +781,10 @@ export function createFactory(deps: FactoryDeps): Factory {
         { label: 'Jobs today', value: `${usage.jobsToday} of ${config.budgets.jobs_per_day}` },
         {
           label: 'Spend today',
-          value: `$${usage.usdToday.toFixed(2)} of $${config.budgets.usd_per_day}`,
+          value:
+            config.budgets.usd_per_day === undefined
+              ? `$${usage.usdToday.toFixed(2)}`
+              : `$${usage.usdToday.toFixed(2)} of $${config.budgets.usd_per_day}`,
         },
       ],
     };

@@ -1,6 +1,8 @@
 # @anbiq/engine-claude-code
 
-The Claude Code agent engine for Anbiq. It turns a job's stage, request, acceptance criteria and feedback into an invocation the runner executes: the prompt, the tools the crew may use, and its limits.
+The Claude Code agent engine for Anbiq. It turns a job's stage, request, acceptance criteria and feedback into an invocation the runner executes: the prompt, a Claude Code settings file with the crew's permissions, and its limits.
+
+The prompt and the permissions themselves come from `@anbiq/core` (`buildPrompt`, `crewPermissions`, `FORBIDDEN`) and are the same for every engine. This package only spells them as Claude Code allow and deny rules.
 
 ## What each crew may do
 

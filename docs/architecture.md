@@ -89,17 +89,17 @@ interface GitHost {
 
 ```ts
 interface Runner {
-  start(run: RunSpec): Promise<RunRef>; // RunSpec: job, stage, engine, limits, allowed tools
+  start(run: RunSpec): Promise<RunRef>; // RunSpec: job, stage, branch, the engine's invocation
   cancel(run: RunRef): Promise<void>;
 }
 
 interface AgentEngine {
   id: string; // "claude-code", ...
-  prepare(run: RunSpec): EngineInvocation; // prompt template, tool allowlist, limits
+  prepare(input): EngineInvocation; // the prompt, the agent's settings, limits
 }
 ```
 
-The runner decides where a run executes. The engine decides how the agent is invoked. Each run receives only the credentials its stage needs, and never deploy or production credentials.
+The runner decides where a run executes. The engine decides how the agent is invoked. The core says what each crew may do in terms no agent knows about (`crewPermissions`: edit code, run these commands, commit, read the history) and what no crew may ever do (`FORBIDDEN`); the engine translates both into its own agent's settings. The prompt is the same for every engine. Each run receives only the credentials its stage needs, and never deploy or production credentials.
 
 ### Event sink
 
@@ -225,7 +225,7 @@ policy:
     paths: ['**/*.md', 'docs/**'] # low-risk files
     max_changed_lines: 200
 budgets:
-  usd_per_day: 25
+  usd_per_day: 25 # optional; leave it out for an engine that does not report cost
   jobs_per_day: 10
   concurrent_jobs: 1
 enabled: true # the kill switch

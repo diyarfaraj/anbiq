@@ -38,7 +38,8 @@ const resultSchema = z.object({
     .string()
     .regex(/^[0-9a-f]{40}$/)
     .nullish(),
-  costUsd: z.number().min(0).default(0),
+  /** Null when the agent does not report what the run cost. */
+  costUsd: z.number().min(0).nullish(),
 });
 
 export type CallbackResult = { ok: true; result: RunResult } | { ok: false; error: string };
@@ -77,7 +78,7 @@ export function parseCallback(body: string, expectedRunId: string): CallbackResu
       stage: data.stage,
       outcome: data.outcome,
       summary,
-      costUsd: data.costUsd,
+      ...(typeof data.costUsd === 'number' ? { costUsd: data.costUsd } : {}),
       ...(data.headSha ? { headSha: data.headSha } : {}),
       ...(data.outcome === 'needs-input' && data.question ? { question: data.question } : {}),
     },

@@ -19,6 +19,16 @@ export type { Decision, PolicyContext, PullRequestState } from './policy.js';
 export { fastLaneVerdict, matchesGlob } from './fast-lane.js';
 export type { ChangedFile, FastLane, FastLaneVerdict } from './fast-lane.js';
 
+export {
+  FORBIDDEN,
+  RESULT_FILE,
+  buildPrompt,
+  crewPermissions,
+  projectInstructionsFile,
+} from './crew.js';
+export type { CrewPermissions, CrewPromptInput } from './crew.js';
+export { CREW_INSTRUCTIONS } from './crew-instructions.js';
+
 export { canAcceptJob, canStartRun } from './budget.js';
 export type { BudgetCheck, Usage } from './budget.js';
 

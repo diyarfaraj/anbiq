@@ -316,8 +316,9 @@ export const BOARD_JS = `"use strict";
     $("stat-crews-sub").textContent = building + " building · " + checking + " checking · limit " + budgets.concurrent_jobs;
     $("stat-waiting").textContent = String(jobs.filter((job) => job.stage === "awaiting-approval" || job.stage === "blocked").length);
     $("stat-spend").textContent = money(usage.usdToday);
-    $("stat-budget").textContent = "of " + money(budgets.usd_per_day);
-    meter($("spend-bar"), usage.usdToday, budgets.usd_per_day);
+    const limited = typeof budgets.usd_per_day === "number";
+    $("stat-budget").textContent = limited ? "of " + money(budgets.usd_per_day) : "no daily limit";
+    meter($("spend-bar"), limited ? usage.usdToday : 0, limited ? budgets.usd_per_day : 1);
     $("stat-merged").textContent = String(state.mergedThisWeek);
     $("stat-jobs").textContent = usage.jobsToday + " of " + budgets.jobs_per_day + " jobs today";
   }

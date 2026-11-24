@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseConfig, type AnbiqConfig } from '@anbiq/core';
+import { crewPermissions, parseConfig, type AnbiqConfig, type CrewStage } from '@anbiq/core';
 import { ClaudeCodeEngine, DENIED_TOOLS, RESULT_FILE, allowedTools } from './index.js';
 
 const parsed = parseConfig(`
@@ -29,7 +29,12 @@ describe('ClaudeCodeEngine', () => {
       timeoutMinutes: 30,
       model: 'some-model',
     });
-    expect(invocation.deniedTools).toEqual(DENIED_TOOLS);
+    expect(invocation.settings).toEqual({
+      permissions: {
+        allow: allowedTools(crewPermissions('build', ['pnpm test', 'pnpm lint'])),
+        deny: DENIED_TOOLS,
+      },
+    });
   });
 
   it('fences the request as data, so a message cannot close the fence and add instructions', () => {
@@ -72,33 +77,53 @@ describe('ClaudeCodeEngine', () => {
 });
 
 describe('allowedTools', () => {
-  const verify = ['pnpm test'];
+  const tools = (stage: CrewStage) => allowedTools(crewPermissions(stage, ['pnpm test']));
 
   it('keeps the spec and review crews from editing code', () => {
     for (const stage of ['spec', 'review'] as const) {
-      const tools = allowedTools(stage, verify);
-      expect(tools).not.toContain('Edit');
-      expect(tools).not.toContain('Write');
-      expect(tools).toContain(`Edit(${RESULT_FILE})`);
-      expect(tools).not.toContain(`Write(${RESULT_FILE})`);
+      expect(tools(stage)).not.toContain('Edit');
+      expect(tools(stage)).not.toContain('Write');
+      expect(tools(stage)).toContain(`Edit(${RESULT_FILE})`);
+      expect(tools(stage)).not.toContain(`Write(${RESULT_FILE})`);
     }
   });
 
   it('lets build and QA edit, run the verify commands and commit, but never push', () => {
-    const tools = allowedTools('build', verify);
-    expect(tools).toEqual(
+    expect(tools('build')).toEqual(
       expect.arrayContaining(['Edit', 'Write', 'Bash(pnpm test:*)', 'Bash(git commit:*)']),
     );
-    expect(tools.some((tool) => tool.includes('git push'))).toBe(false);
+    expect(tools('build').some((tool) => tool.includes('git push'))).toBe(false);
   });
 
   it('only allows the spec crew to read the code', () => {
-    expect(allowedTools('spec', verify).some((tool) => tool.startsWith('Bash'))).toBe(false);
+    expect(tools('spec').some((tool) => tool.startsWith('Bash'))).toBe(false);
   });
 
-  it('denies pushing, network access and secrets for every crew', () => {
-    expect(DENIED_TOOLS).toEqual(
-      expect.arrayContaining(['Bash(git push:*)', 'Bash(curl:*)', 'WebFetch', 'Read(./.env)']),
+  it('lets the review crew run the verify commands and read the diff, but not commit', () => {
+    expect(tools('review')).toEqual(
+      expect.arrayContaining(['Bash(pnpm test:*)', 'Bash(git diff:*)', 'Bash(git log:*)']),
+    );
+    expect(tools('review').some((tool) => /git (add|commit)/.test(tool))).toBe(false);
+  });
+
+  it('denies everything the core forbids every crew', () => {
+    expect([...DENIED_TOOLS].sort()).toEqual(
+      [
+        'Bash(git push:*)',
+        'Bash(git remote:*)',
+        'Bash(git config:*)',
+        'Bash(curl:*)',
+        'Bash(wget:*)',
+        'Bash(ssh:*)',
+        'Bash(env)',
+        'Bash(printenv:*)',
+        'WebFetch',
+        'WebSearch',
+        'Read(./.env)',
+        'Read(./.env.*)',
+        'Edit(.github/workflows/**)',
+        'Write(.github/workflows/**)',
+      ].sort(),
     );
   });
 });

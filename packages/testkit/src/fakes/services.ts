@@ -198,7 +198,7 @@ export class FakeEngine implements AgentEngine {
     return {
       engine: this.id,
       prompt: `[${input.stage}] ${input.request}${spec}${feedback}`,
-      allowedTools: ['read', 'edit', 'test'],
+      settings: { tools: ['read', 'edit', 'test'] },
       maxTurns: 10,
       timeoutMinutes: 10,
     };

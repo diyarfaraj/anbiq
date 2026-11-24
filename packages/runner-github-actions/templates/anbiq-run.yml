@@ -60,7 +60,7 @@ jobs:
           [[ "$RUN_ID" =~ ^[A-Za-z0-9-]{1,64}$ ]] || { echo "::error::invalid run ID"; exit 1; }
           [[ "$BRANCH" =~ ^anbiq/[a-z0-9]{1,40}$ ]] || { echo "::error::refusing branch $BRANCH"; exit 1; }
           printf '%s' "$INVOCATION" | base64 -d > "$RUNNER_TEMP/invocation.json"
-          jq -e '(.prompt | type == "string") and (.allowedTools | type == "array") and (.maxTurns | type == "number")' \
+          jq -e '(.engine | type == "string") and (.prompt | type == "string") and (.settings | type == "object") and (.maxTurns | type == "number")' \
             "$RUNNER_TEMP/invocation.json" > /dev/null
 
       - uses: actions/checkout@v4
@@ -100,13 +100,24 @@ jobs:
             echo "prompt<<$delimiter"
             jq -r '.prompt' "$inv"
             echo "$delimiter"
-            echo "settings=$(jq -c '{permissions: {allow: .allowedTools, deny: (.deniedTools // [])}}' "$inv")"
+            echo "engine=$(jq -r '.engine | select(test("^[a-z0-9-]{1,40}$"))' "$inv")"
+            echo "settings=$(jq -c '.settings' "$inv")"
             echo "args=--max-turns $(jq -r '.maxTurns' "$inv")$(jq -r 'if .model then " --model " + .model else "" end' "$inv")"
             echo "timeout=$(jq -r '.timeoutMinutes // 60' "$inv")"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Run the crew
-        id: crew
+      # One step per agent engine. `engine.id` in anbiq.yml decides which one runs; each brings its
+      # own agent and its own secret. `settings` is that agent's configuration, with the crew's
+      # permissions, as the factory prepared it.
+      - name: Refuse an engine this workflow has no step for
+        if: ${{ !contains(fromJSON('["claude-code"]'), steps.prepare.outputs.engine) }}
+        run: |
+          echo "::error::this workflow has no step for the configured agent engine"
+          exit 1
+
+      - name: Run the crew (claude-code)
+        id: claude-code
+        if: steps.prepare.outputs.engine == 'claude-code'
         uses: anthropics/claude-code-action@v1
         timeout-minutes: ${{ fromJSON(steps.prepare.outputs.timeout) }}
         with:
@@ -127,7 +138,7 @@ jobs:
         if: always()
         env:
           START: ${{ steps.prepare.outputs.start }}
-          EXECUTION_FILE: ${{ steps.crew.outputs.execution_file }}
+          EXECUTION_FILE: ${{ steps.claude-code.outputs.execution_file }}
         run: |
           out="$RUNNER_TEMP/out"
           mkdir -p "$out"
@@ -136,12 +147,13 @@ jobs:
           else
             echo '{"outcome":"failed","summary":"The crew finished without reporting a result."}' > "$out/result.json"
           fi
-          cost=0
+          # Null when the agent does not report what it cost: the factory then counts jobs only.
+          cost=null
           if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
-            cost=$(jq '[.[]? | select(.type == "result") | .total_cost_usd // 0] | add // 0' "$EXECUTION_FILE" 2> /dev/null || echo 0)
+            cost=$(jq '[.[]? | select(.type == "result") | .total_cost_usd // 0] | add // 0' "$EXECUTION_FILE" 2> /dev/null || echo null)
           fi
           head=$(git rev-parse HEAD)
-          jq -n --arg start "${START:-}" --arg head "$head" --argjson cost "${cost:-0}" \
+          jq -n --arg start "${START:-}" --arg head "$head" --argjson cost "${cost:-null}" \
             '{start: $start, head: $head, costUsd: $cost}' > "$out/meta.json"
           if [ -n "$START" ] && [ "$head" != "$START" ]; then
             git branch -f anbiq-crew HEAD
@@ -203,10 +215,10 @@ jobs:
           crew="$RUNNER_TEMP/crew"
           result="$crew/result.json"
           [ -f "$result" ] || echo '{"outcome":"failed","summary":"The crew job did not finish."}' > "$result"
-          cost=$(jq '.costUsd // 0' "$crew/meta.json" 2> /dev/null || echo 0)
+          cost=$(jq '.costUsd' "$crew/meta.json" 2> /dev/null || echo null)
           body=$(jq -c \
             --arg runId "$RUN_ID" --arg jobId "$JOB_ID" --arg stage "$STAGE" \
-            --arg headSha "$HEAD_SHA" --argjson cost "${cost:-0}" \
+            --arg headSha "$HEAD_SHA" --argjson cost "${cost:-null}" \
             '{runId: $runId, jobId: $jobId, stage: $stage, outcome: .outcome, summary: .summary,
               question: .question, headSha: (if $headSha == "" then null else $headSha end), costUsd: $cost}' \
             "$result")

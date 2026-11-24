@@ -30,7 +30,7 @@ export function canStartRun(usage: Usage, budgets: Budgets): BudgetCheck {
 }
 
 function spendLeft(usage: Usage, budgets: Budgets): BudgetCheck {
-  if (usage.usdToday >= budgets.usd_per_day) {
+  if (budgets.usd_per_day !== undefined && usage.usdToday >= budgets.usd_per_day) {
     return { ok: false, reason: `the daily budget of $${budgets.usd_per_day} is spent` };
   }
   return { ok: true };
