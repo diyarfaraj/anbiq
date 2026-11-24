@@ -1,6 +1,6 @@
 # Publishes every package whose version is not on npm yet, with provenance.
-# Uses npm trusted publishing (OIDC), so no npm token is stored. Each package must list this
-# repository and workflow as a trusted publisher on npmjs.com (package → Settings).
+# Uses npm trusted publishing (OIDC), so no npm token is stored. Each package lists this
+# repository, this workflow file and the "npm" environment as its trusted publisher on npmjs.com.
 name: Release
 
 on:
@@ -33,7 +33,23 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # pnpm packs each package, turning workspace:* into real versions; npm publishes the
+      # tarball through trusted publishing. Versions already on npm are skipped.
       - name: Publish new versions
-        env:
-          NPM_CONFIG_PROVENANCE: 'true'
-        run: pnpm -r publish --no-git-checks --access public
+        run: |
+          packs="$RUNNER_TEMP/packs"
+          mkdir -p "$packs"
+          for dir in packages/core packages/testkit packages/*/; do
+            dir="${dir%/}"
+            name=$(jq -r .name "$dir/package.json")
+            version=$(jq -r .version "$dir/package.json")
+            [ -f "$packs/.$(echo "$name" | tr / -)" ] && continue
+            touch "$packs/.$(echo "$name" | tr / -)"
+            if npm view "$name@$version" version > /dev/null 2>&1; then
+              echo "$name@$version is already published"
+              continue
+            fi
+            (cd "$dir" && pnpm pack --pack-destination "$packs" > /dev/null)
+            tarball="$packs/$(echo "${name#@}" | tr / -)-$version.tgz"
+            npm publish "$tarball" --access public --provenance
+          done
