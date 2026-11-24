@@ -1,4 +1,4 @@
-import { HeadMovedError, type GitHost, type PullRequestRef } from '@anbiq/core';
+import { HeadMovedError, MergeRefusedError, type GitHost, type PullRequestRef } from '@anbiq/core';
 import { GitHubClient, GitHubError, type RepositoryOptions } from './client.js';
 
 export interface GitHubGitHostOptions extends RepositoryOptions {
@@ -10,7 +10,12 @@ interface PullRequest {
   number: number;
   html_url: string;
   head: { sha: string };
+  state?: string;
+  merged?: boolean;
 }
+
+/** GitHub answers these when its own rules stop a merge: a missing review, a failing check. */
+const MERGE_REFUSED = new Set([403, 405, 422]);
 
 const PASSING = new Set(['success', 'neutral', 'skipped']);
 
@@ -40,8 +45,14 @@ export class GitHubGitHost implements GitHost {
    * Checks pass only when at least one check or status exists for the head commit, none is
    * still running and none failed. A repository without any checks never counts as passing.
    */
-  async pullRequestState(pr: PullRequestRef): Promise<{ checksPassed: boolean; headSha: string }> {
-    const headSha = (await this.client.repo<PullRequest>('GET', `/pulls/${pr.id}`)).head.sha;
+  async pullRequestState(pr: PullRequestRef): Promise<{
+    checksPassed: boolean;
+    headSha: string;
+    status: 'open' | 'merged' | 'closed';
+  }> {
+    const pull = await this.client.repo<PullRequest>('GET', `/pulls/${pr.id}`);
+    const headSha = pull.head.sha;
+    const status = pull.merged ? 'merged' : pull.state === 'closed' ? 'closed' : 'open';
     const checks = await this.client.repo<{
       total_count: number;
       check_runs: { status: string; conclusion: string | null }[];
@@ -56,7 +67,7 @@ export class GitHubGitHost implements GitHost {
     );
     const statusesGreen = statuses.total_count === 0 || statuses.state === 'success';
     const anything = checks.total_count + statuses.total_count > 0;
-    return { checksPassed: anything && checksGreen && statusesGreen, headSha };
+    return { checksPassed: anything && checksGreen && statusesGreen, headSha, status };
   }
 
   /** Squash-merges, pinned to the reviewed commit: GitHub refuses if the head has moved. */
@@ -70,6 +81,9 @@ export class GitHubGitHost implements GitHost {
       if (error instanceof GitHubError && error.status === 409) {
         const actual = (await this.client.repo<PullRequest>('GET', `/pulls/${pr.id}`)).head.sha;
         throw new HeadMovedError(expectedHeadSha, actual);
+      }
+      if (error instanceof GitHubError && MERGE_REFUSED.has(error.status)) {
+        throw new MergeRefusedError(error.reason);
       }
       throw error;
     }

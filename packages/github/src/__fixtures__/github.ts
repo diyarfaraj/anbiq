@@ -2,11 +2,22 @@
 export function fakeGitHub() {
   let nextNumber = 1;
   let nextCommentId = 1000;
-  const issues = new Map<number, { title: string; body: string; labels: string[] }>();
+  const issues = new Map<
+    number,
+    { title: string; body: string; labels: string[]; state: string }
+  >();
   const comments = new Map<number, { id: number; issue: number; body: string }>();
   const pulls = new Map<
     number,
-    { head: string; base: string; title: string; sha: string; merged: boolean }
+    {
+      head: string;
+      base: string;
+      title: string;
+      sha: string;
+      merged: boolean;
+      state: string;
+      refusal?: string;
+    }
   >();
   const checks = new Map<string, { status: string; conclusion: string | null }[]>();
   const statuses = new Map<string, string[]>();
@@ -41,6 +52,7 @@ export function fakeGitHub() {
         title: String(body.title),
         body: String(body.body),
         labels: (body.labels as string[]) ?? [],
+        state: 'open',
       });
       return json(201, { number, html_url: `https://github.test/o/r/issues/${number}` });
     }
@@ -62,6 +74,11 @@ export function fakeGitHub() {
       comment.body = String(body.body);
       return json(200, comment);
     }
+    if (method === 'GET' && (m = /^\/issues\/(\d+)$/.exec(path))) {
+      const issue = issues.get(Number(m[1]));
+      if (!issue) return json(404, { message: 'Not Found' });
+      return json(200, { number: Number(m[1]), state: issue.state });
+    }
     if ((m = /^\/issues\/(\d+)\/labels$/.exec(path))) {
       const issue = issues.get(Number(m[1]));
       if (!issue) return json(404, { message: 'Not Found' });
@@ -79,6 +96,7 @@ export function fakeGitHub() {
         title: String(body.title),
         sha: 'sha-0',
         merged: false,
+        state: 'open',
       });
       return json(201, {
         number,
@@ -91,7 +109,9 @@ export function fakeGitHub() {
       if (!pr) return json(404, { message: 'Not Found' });
       if (body.sha !== pr.sha)
         return json(409, { message: 'Head branch was modified. Review and try the merge again.' });
+      if (pr.refusal) return json(405, { message: pr.refusal });
       pr.merged = true;
+      pr.state = 'closed';
       return json(200, { merged: true, sha: 'merge-sha' });
     }
     if (method === 'GET' && (m = /^\/pulls\/(\d+)$/.exec(path))) {
@@ -102,6 +122,8 @@ export function fakeGitHub() {
         number,
         html_url: `https://github.test/o/r/pull/${number}`,
         head: { sha: pr.sha },
+        state: pr.state,
+        merged: pr.merged,
       });
     }
     if ((m = /^\/commits\/([^/]+)\/check-runs$/.exec(path))) {
@@ -135,6 +157,24 @@ export function fakeGitHub() {
       const pr = pulls.get(prNumber);
       if (!pr) throw new Error(`no pull request ${prNumber}`);
       pr.sha = sha;
+    },
+    /** A branch rule that stops the merge, such as a required review. */
+    refuseMerge(prNumber: number, message: string) {
+      const pr = pulls.get(prNumber);
+      if (!pr) throw new Error(`no pull request ${prNumber}`);
+      pr.refusal = message;
+    },
+    /** Someone closes the pull request on GitHub, with or without merging it. */
+    closePull(prNumber: number, merged: boolean) {
+      const pr = pulls.get(prNumber);
+      if (!pr) throw new Error(`no pull request ${prNumber}`);
+      pr.state = 'closed';
+      pr.merged = merged;
+    },
+    closeIssue(number: number) {
+      const issue = issues.get(number);
+      if (!issue) throw new Error(`no issue ${number}`);
+      issue.state = 'closed';
     },
     setChecks(sha: string, runs: { status: string; conclusion: string | null }[]) {
       checks.set(sha, runs);

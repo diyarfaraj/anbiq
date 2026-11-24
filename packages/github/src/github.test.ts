@@ -1,6 +1,6 @@
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { HeadMovedError } from '@anbiq/core';
+import { HeadMovedError, MergeRefusedError } from '@anbiq/core';
 import { GitHubAppAuth, staticToken } from './auth.js';
 import { GitHubGitHost } from './git-host.js';
 import { GitHubTracker } from './tracker.js';
@@ -27,6 +27,14 @@ describe('GitHubTracker', () => {
     const stored = github.issues.get(Number(issue.id))!;
     expect(stored.labels).toEqual(['anbiq']);
     expect(stored.body).toContain('<!-- anbiq:job acme-1 -->');
+  });
+
+  it('knows when an issue was closed', async () => {
+    const { github, tracker } = adapters();
+    const issue = await tracker.createJob({ jobId: 'acme-1', title: 't', body: 'b' });
+    expect(await tracker.isOpen(issue)).toBe(true);
+    github.closeIssue(Number(issue.id));
+    expect(await tracker.isOpen(issue)).toBe(false);
   });
 
   it("moves the stage label and keeps people's own labels", async () => {
@@ -131,6 +139,35 @@ describe('GitHubGitHost', () => {
     const error = await gitHost.merge(pr, 'sha-1').catch((e: unknown) => e);
     expect(error).toBeInstanceOf(HeadMovedError);
     expect(error).toMatchObject({ expected: 'sha-1', actual: 'sha-2' });
+  });
+
+  it("reports a merge that GitHub's branch rules refuse, with GitHub's own reason", async () => {
+    const { github, gitHost } = adapters();
+    const pr = await gitHost.openPullRequest({
+      jobId: 'acme-1',
+      branch: 'b',
+      title: 't',
+      body: '',
+    });
+    github.push(Number(pr.id), 'sha-1');
+    github.refuseMerge(Number(pr.id), 'At least 1 approving review is required.');
+    const error = await gitHost.merge(pr, 'sha-1').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MergeRefusedError);
+    expect(error).toMatchObject({ reason: 'At least 1 approving review is required.' });
+    expect(github.pulls.get(Number(pr.id))?.merged).toBe(false);
+  });
+
+  it('tells an open pull request from one merged or closed on GitHub', async () => {
+    const { github, gitHost } = adapters();
+    const open = { jobId: 'acme-1', branch: 'b', title: 't', body: '' };
+    const merged = await gitHost.openPullRequest(open);
+    const closed = await gitHost.openPullRequest(open);
+    const untouched = await gitHost.openPullRequest(open);
+    github.closePull(Number(merged.id), true);
+    github.closePull(Number(closed.id), false);
+    expect((await gitHost.pullRequestState(merged)).status).toBe('merged');
+    expect((await gitHost.pullRequestState(closed)).status).toBe('closed');
+    expect((await gitHost.pullRequestState(untouched)).status).toBe('open');
   });
 
   it('squash-merges', async () => {

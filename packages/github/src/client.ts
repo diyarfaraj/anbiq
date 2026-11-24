@@ -12,6 +12,8 @@ export class GitHubError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** GitHub's own explanation, without the request it belongs to. */
+    readonly reason: string = message,
   ) {
     super(message);
     this.name = 'GitHubError';
@@ -66,7 +68,11 @@ export class GitHubClient {
     if (!response.ok) {
       const message =
         (parsed as { message?: string } | undefined)?.message ?? `HTTP ${response.status}`;
-      throw new GitHubError(response.status, `GitHub ${method} ${path} failed: ${message}`);
+      throw new GitHubError(
+        response.status,
+        `GitHub ${method} ${path} failed: ${message}`,
+        message,
+      );
     }
     return parsed as T;
   }

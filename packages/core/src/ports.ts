@@ -88,6 +88,11 @@ export interface Tracker {
   /** Marks the job as taken by one run. Returns false if another run holds it. */
   claim(issue: IssueRef, runId: string): Promise<boolean>;
   release(issue: IssueRef, runId: string): Promise<void>;
+  /**
+   * False once the job's issue was closed. Optional: a tracker without it is never asked, and
+   * its jobs are only finished through the factory.
+   */
+  isOpen?(issue: IssueRef): Promise<boolean>;
 }
 
 export interface PullRequestRef {
@@ -102,9 +107,25 @@ export interface GitHost {
     title: string;
     body: string;
   }): Promise<PullRequestRef>;
-  pullRequestState(pr: PullRequestRef): Promise<{ checksPassed: boolean; headSha: string }>;
-  /** Merges only if the head is still `expectedHeadSha`; throws HeadMovedError otherwise. */
+  /** `status` lets the factory notice a pull request merged or closed on the host itself. */
+  pullRequestState(pr: PullRequestRef): Promise<{
+    checksPassed: boolean;
+    headSha: string;
+    status?: 'open' | 'merged' | 'closed';
+  }>;
+  /**
+   * Merges only if the head is still `expectedHeadSha`; throws HeadMovedError otherwise, and
+   * MergeRefusedError when the host's own rules do not allow the merge.
+   */
   merge(pr: PullRequestRef, expectedHeadSha: string): Promise<void>;
+}
+
+/** The git host refused the merge, for example because the branch needs an approving review. */
+export class MergeRefusedError extends Error {
+  constructor(readonly reason: string) {
+    super(`the merge was refused: ${reason}`);
+    this.name = 'MergeRefusedError';
+  }
 }
 
 export class HeadMovedError extends Error {
@@ -211,6 +232,8 @@ export interface JobStore {
   save(job: JobRecord): Promise<void>;
   findByThread(thread: ThreadRef): Promise<JobRecord | undefined>;
   listQueued(): Promise<JobRecord[]>;
+  /** Every job that is not merged, deployed or cancelled. */
+  listUnfinished(): Promise<JobRecord[]>;
   recordCost(jobId: string, usd: number, at: string): Promise<void>;
   /** Spend and job counts for the UTC day containing `at`, and jobs running now. */
   usage(at: string): Promise<Usage>;

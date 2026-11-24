@@ -345,3 +345,126 @@ describe('budgets', () => {
     expect(f.tracker.issues.size).toBe(3);
   });
 });
+
+describe('what happens on the git host and tracker directly', () => {
+  it('reports a merge the git host refuses, and merges once that is sorted out', async () => {
+    const f = setup();
+    const prId = await f.toApproval('sha-1');
+    f.gitHost.refuse(prId, 'At least 1 approving review is required.');
+
+    await f.say(OWNER, 'merge');
+    expect(f.lastReply()).toBe('Not merged: At least 1 approving review is required.');
+    expect(f.gitHost.pullRequests.get(prId)?.merged).toBe(false);
+    expect(f.tracker.issues.get('1')?.stage).toBe('awaiting-approval');
+
+    f.gitHost.refuse(prId, undefined);
+    await f.say(OWNER, 'merge');
+    expect(f.lastReply()).toMatch(/^Merged /);
+  });
+
+  it('tells the person when handling a message fails, instead of staying silent', async () => {
+    const f = setup();
+    await f.toApproval('sha-1');
+    f.gitHost.merge = async () => {
+      throw new Error('the git host is down');
+    };
+
+    await expect(f.say(OWNER, 'merge')).rejects.toThrow('the git host is down');
+    expect(f.lastReply()).toMatch(/^Not done: something went wrong/);
+    expect(f.tracker.issues.get('1')?.stage).toBe('awaiting-approval');
+  });
+
+  it('notices a pull request merged on the git host when the next message arrives', async () => {
+    const f = setup();
+    const prId = await f.toApproval('sha-1');
+    f.gitHost.finishOutside(prId, 'merged');
+
+    await f.say(OWNER, 'revise: make it blue');
+    expect(f.lastReply()).toMatch(/is merged$/);
+    expect(f.tracker.issues.get('1')?.stage).toBe('merged');
+    // The revision was not started: the work is already on the base branch.
+    expect(f.stages()).toEqual(['spec', 'build', 'qa', 'review']);
+    expect(f.events.kinds()).toContain('merged');
+  });
+
+  it('stops the running crew when the pull request is merged under it', async () => {
+    const f = setup();
+    await f.say(OWNER, 'Add a copy-link button');
+    await f.finish('passed'); // spec
+    await f.finish('passed'); // build: opens the pull request, starts QA
+    const qa = f.runner.last();
+    f.gitHost.finishOutside('1', 'merged');
+
+    await f.factory.reconcile();
+    expect(f.runner.cancelled).toContain(qa.runId);
+    expect(f.tracker.issues.get('1')?.stage).toBe('merged');
+    expect(f.lastReply()).toMatch(/is merged$/);
+
+    // A late result from the stopped crew changes nothing.
+    await f.factory.handleRunResult({
+      runId: qa.runId,
+      jobId: qa.jobId,
+      stage: 'qa',
+      outcome: 'failed',
+      summary: 'late',
+      costUsd: 0,
+    });
+    expect(f.tracker.issues.get('1')?.stage).toBe('merged');
+  });
+
+  it('cancels a job whose pull request or issue was closed', async () => {
+    const f = setup();
+    const prId = await f.toApproval('sha-1', 'T1');
+    f.gitHost.finishOutside(prId, 'closed');
+
+    await f.say(OWNER, 'A request that never got going', 'T2');
+    await f.finish('failed'); // spec fails: the job waits for a person
+    f.tracker.close('2');
+
+    await f.factory.reconcile();
+    expect(f.tracker.issues.get('1')?.stage).toBe('cancelled');
+    expect(f.tracker.issues.get('2')?.stage).toBe('cancelled');
+    expect(f.lastReply('T1')).toMatch(/is cancelled$/);
+    expect(f.lastReply('T2')).toMatch(/is cancelled$/);
+    expect(await f.store.listUnfinished()).toEqual([]);
+  });
+
+  it('frees the slot of a job that ended outside, so a queued job starts', async () => {
+    const f = setup();
+    await f.say(OWNER, 'First job', 'T1');
+    await f.say(OWNER, 'Second job', 'T2');
+    expect(f.lastReply('T2')).toMatch(/is queued/);
+    f.tracker.close('1');
+
+    await f.factory.reconcile();
+    expect(f.tracker.issues.get('1')?.stage).toBe('cancelled');
+    expect(f.runner.last().jobId).not.toBe(f.runner.started[0]?.jobId);
+  });
+
+  it('keeps checking the other jobs when one cannot be checked', async () => {
+    const f = setup();
+    await f.say(OWNER, 'First job', 'T1');
+    await f.finish('failed');
+    await f.say(OWNER, 'Second job', 'T2');
+    await f.finish('failed');
+    f.tracker.close('2');
+    const isOpen = f.tracker.isOpen.bind(f.tracker);
+    f.tracker.isOpen = async (issue) => {
+      if (issue.id === '1') throw new Error('tracker timeout');
+      return isOpen(issue);
+    };
+
+    await expect(f.factory.reconcile()).rejects.toThrow('tracker timeout');
+    expect(f.tracker.issues.get('2')?.stage).toBe('cancelled');
+    expect(f.tracker.issues.get('1')?.stage).toBe('blocked');
+  });
+
+  it('leaves jobs alone while nothing changed outside', async () => {
+    const f = setup();
+    await f.toApproval('sha-1');
+    const before = f.tap.transcript().length;
+    await f.factory.reconcile();
+    expect(f.tap.transcript()).toHaveLength(before);
+    expect(f.tracker.issues.get('1')?.stage).toBe('awaiting-approval');
+  });
+});

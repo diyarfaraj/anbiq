@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InvalidTransitionError, canTransition, createJob, transition } from './job.js';
+import { InvalidTransitionError, canTransition, createJob, settle, transition } from './job.js';
 
 const job = createJob({
   id: 'acme-web#1',
@@ -48,6 +48,17 @@ describe('job lifecycle', () => {
     expect(() => transition({ ...job, stage: 'build' }, 'merged', 'now')).toThrow(
       InvalidTransitionError,
     );
+  });
+
+  it('records a job that ended outside the factory, from any unfinished stage', () => {
+    expect(settle({ ...job, stage: 'build' }, 'merged', 'later')).toMatchObject({
+      stage: 'merged',
+      updatedAt: 'later',
+    });
+    expect(settle({ ...job, stage: 'blocked' }, 'cancelled', 'later').stage).toBe('cancelled');
+    for (const stage of ['merged', 'deployed', 'cancelled'] as const) {
+      expect(() => settle({ ...job, stage }, 'merged', 'later')).toThrow(InvalidTransitionError);
+    }
   });
 
   it('never leaves cancelled', () => {

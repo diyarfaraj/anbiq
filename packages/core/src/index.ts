@@ -10,7 +10,7 @@ export type { Command, CommandResult } from './command.js';
 export { findPerson, hasRole } from './identity.js';
 export type { Person } from './identity.js';
 
-export { InvalidTransitionError, canTransition, createJob, transition } from './job.js';
+export { InvalidTransitionError, canTransition, createJob, settle, transition } from './job.js';
 export type { Job } from './job.js';
 
 export { decide } from './policy.js';
@@ -19,7 +19,7 @@ export type { Decision, PolicyContext, PullRequestState } from './policy.js';
 export { canAcceptJob, canStartRun } from './budget.js';
 export type { BudgetCheck, Usage } from './budget.js';
 
-export { HeadMovedError } from './ports.js';
+export { HeadMovedError, MergeRefusedError } from './ports.js';
 export type {
   AgentEngine,
   CrewStage,

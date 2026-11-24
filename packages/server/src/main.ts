@@ -9,6 +9,7 @@ import type { SerialQueue } from './queue.js';
 import type { SqliteDatabase } from './sqlite.js';
 
 const logger = jsonLogger();
+const RECONCILE_EVERY_MS = 2 * 60 * 1000;
 
 function start(): void {
   let loaded;
@@ -57,6 +58,12 @@ function start(): void {
       enabled: app.config.enabled,
     });
   });
+  // People also merge and close things on GitHub itself. Checking through the same queue as
+  // messages and callbacks keeps a job from being changed by two things at once.
+  setInterval(
+    () => app.queue.defer(() => app.factory.reconcile(), 'reconcile'),
+    RECONCILE_EVERY_MS,
+  ).unref();
   stopOnSignals(server, app.queue, app.database, logger);
 }
 
