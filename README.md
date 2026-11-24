@@ -1,7 +1,7 @@
 # Anbiq
 
 <p align="center">
-  <img src="docs/assets/anbiq-banner.jpg" alt="Anbiq: a copper alembic turning chat messages into a pull request. Distill requests into shipped code." width="100%">
+  <img src="docs/assets/anbiq-banner.jpg" alt="Anbiq: a copper alembic distilling Slack, Microsoft Teams and Discord messages into a pull request. Distill requests into shipped code." width="100%">
 </p>
 
 **Anbiq** (an-BEEK), from Arabic _al-anbīq_ (الأنبيق), the alchemist's still that became the "alembic".
@@ -50,6 +50,12 @@ A still has four parts, and so does Anbiq:
 See [docs/architecture.md](docs/architecture.md) for the interfaces, the job lifecycle and the security model, and [docs/crews.md](docs/crews.md) for what each crew does.
 
 ## Run it
+
+Try the live board first, with the real factory and a simulated outside world (no accounts or keys needed):
+
+```sh
+npx @anbiq/server --demo   # then open http://localhost:8080/board
+```
 
 Anbiq runs as one small container with a SQLite file. [docs/deploy.md](docs/deploy.md) walks through the GitHub App, the crew workflow, `anbiq.yml`, the environment and the webhook URLs.
 

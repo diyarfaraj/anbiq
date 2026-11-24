@@ -14,6 +14,11 @@ export interface BoardOptions {
   events: SqliteEventSink;
   logger: Logger;
   now?: () => Date;
+  /**
+   * Demo mode only: the board is open without signing in and is marked as demo data. Never set
+   * this on a factory with real data.
+   */
+  demo?: boolean;
 }
 
 const COOKIE = 'anbiq_board';
@@ -96,6 +101,11 @@ export function createBoard(options: BoardOptions) {
       now: at,
       budgets: config.budgets,
       usage: await store.usage(at),
+      mergedThisWeek: events.countSince(
+        'merged',
+        new Date(now().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      ),
+      demo: options.demo === true,
       jobs: store.listRecent(200).map(publicJob),
       events: events.recent(200),
     };
@@ -132,7 +142,7 @@ export function createBoard(options: BoardOptions) {
       return send(response, 200, BOARD_JS, 'text/javascript');
     if (method === 'POST' && path === '/board/login') return login(request, response);
 
-    const signedIn = authenticated(request);
+    const signedIn = options.demo === true || authenticated(request);
     if (method === 'GET' && (path === '/board' || path === '/board/')) {
       return send(response, 200, signedIn ? BOARD_HTML : LOGIN_HTML, 'text/html; charset=utf-8');
     }
