@@ -468,3 +468,104 @@ describe('what happens on the git host and tracker directly', () => {
     expect(f.tracker.issues.get('1')?.stage).toBe('awaiting-approval');
   });
 });
+
+describe('the fast lane', () => {
+  const withLane = (yaml: string) =>
+    yaml.replace(
+      'policy:',
+      "policy:\n  fast_lane: { paths: ['*.md', 'docs/**'], max_changed_lines: 50 }",
+    );
+  const docs = [{ path: 'README.md', changedLines: 7 }];
+  const code = [
+    { path: 'README.md', changedLines: 7 },
+    { path: 'src/app.ts', changedLines: 2 },
+  ];
+
+  /** Runs a job up to the point where build has passed with the given files changed. */
+  async function build(f: ReturnType<typeof setup>, request: string, files: typeof docs) {
+    await f.say(OWNER, request);
+    if (f.runner.last().stage === 'spec') await f.finish('passed');
+    // The pull request opens when build passes, so the files are set as the result arrives.
+    const open = f.gitHost.openPullRequest.bind(f.gitHost);
+    f.gitHost.openPullRequest = async (input) => {
+      const pr = await open(input);
+      f.gitHost.setFiles(pr.id, files);
+      return pr;
+    };
+    await f.finish('passed');
+  }
+
+  it('skips QA for a small change that only touches fast-lane files', async () => {
+    const f = setup(withLane);
+    await build(f, 'Mention Telegram in the README', docs);
+    expect(f.stages()).toEqual(['spec', 'build', 'review']);
+    expect(f.tracker.issues.get('1')?.comments.at(-1)).toMatch(/^QA skipped: .*1 file, 7 changed/);
+
+    await f.finish('passed', { headSha: 'sha-1' });
+    expect(f.lastReply()).toMatch(/is ready for your review/);
+  });
+
+  it('runs QA when the change touches anything else, or is too large', async () => {
+    const touchesCode = setup(withLane);
+    await build(touchesCode, 'Mention Telegram in the README', code);
+    expect(touchesCode.stages()).toEqual(['spec', 'build', 'qa']);
+
+    const tooLarge = setup(withLane);
+    await build(tooLarge, 'Rewrite the README', [{ path: 'README.md', changedLines: 51 }]);
+    expect(tooLarge.stages()).toEqual(['spec', 'build', 'qa']);
+  });
+
+  it('runs every stage when the project has no fast lane', async () => {
+    const f = setup();
+    await build(f, 'Mention Telegram in the README', docs);
+    expect(f.stages()).toEqual(['spec', 'build', 'qa']);
+  });
+
+  it('runs QA when the changed files cannot be read', async () => {
+    const f = setup(withLane);
+    await build(f, 'Mention Telegram in the README', docs);
+    f.gitHost.setFiles('1', new Error('git host timeout'));
+    await f.finish('passed', { headSha: 'sha-1' }); // review
+    await f.say(OWNER, 'revise: add Slack too');
+    await f.finish('passed'); // build again: the files are unreadable this time
+    expect(f.stages()).toEqual(['spec', 'build', 'review', 'build', 'qa']);
+  });
+
+  it('decides again on every attempt: a revision that touches code gets QA', async () => {
+    const f = setup(withLane);
+    await build(f, 'Mention Telegram in the README', docs);
+    await f.finish('passed', { headSha: 'sha-1' }); // review
+    f.gitHost.setFiles('1', code);
+    await f.say(OWNER, 'revise: also log it in the app');
+    await f.finish('passed'); // build again
+    expect(f.stages()).toEqual(['spec', 'build', 'review', 'build', 'qa']);
+  });
+
+  it('takes "quick:" straight to build, and to review when the change is low-risk', async () => {
+    const f = setup(withLane);
+    await build(f, 'quick: mention Telegram in the README', docs);
+    expect(f.tap.transcript('T1')[0]).toMatch(/^Started /);
+    expect(f.runner.started[0]?.invocation.prompt).toBe('[build] mention Telegram in the README');
+    expect(f.stages()).toEqual(['build', 'review']);
+
+    await f.finish('passed', { headSha: 'sha-1' });
+    expect(f.lastReply()).toMatch(/is ready for your review/);
+  });
+
+  it('sends a "quick:" job through QA, and says so, when the change is not low-risk', async () => {
+    const f = setup(withLane);
+    await build(f, 'quick: fix the login bug', code);
+    expect(f.stages()).toEqual(['build', 'qa']);
+    expect(f.lastReply()).toMatch(/is not a quick change after all$/);
+    expect(f.tracker.issues.get('1')?.comments.at(-1)).toBe(
+      'Not a fast-lane change: it touches src/app.ts. QA runs.',
+    );
+  });
+
+  it('treats "quick:" as an ordinary request when the project has no fast lane', async () => {
+    const f = setup();
+    await build(f, 'quick: mention Telegram in the README', docs);
+    expect(f.runner.started[0]?.invocation.prompt).toBe('[spec] mention Telegram in the README');
+    expect(f.stages()).toEqual(['spec', 'build', 'qa']);
+  });
+});

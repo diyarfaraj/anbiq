@@ -170,6 +170,24 @@ describe('GitHubGitHost', () => {
     expect((await gitHost.pullRequestState(untouched)).status).toBe('open');
   });
 
+  it('lists every file a pull request changes, across pages, with renames', async () => {
+    const { github, gitHost } = adapters();
+    const pr = await gitHost.openPullRequest({
+      jobId: 'acme-1',
+      branch: 'b',
+      title: 't',
+      body: '',
+    });
+    github.setFiles(Number(pr.id), [
+      { filename: 'docs/app.md', previous_filename: 'src/app.ts', changes: 0 },
+      ...Array.from({ length: 120 }, (_, i) => ({ filename: `docs/${i}.md`, changes: 2 })),
+    ]);
+    const files = await gitHost.changedFiles(pr);
+    expect(files).toHaveLength(121);
+    expect(files[0]).toEqual({ path: 'docs/app.md', previousPath: 'src/app.ts', changedLines: 0 });
+    expect(files.at(-1)).toEqual({ path: 'docs/119.md', changedLines: 2 });
+  });
+
   it('squash-merges', async () => {
     const { github, gitHost } = adapters();
     const pr = await gitHost.openPullRequest({

@@ -11,6 +11,23 @@ A job passes through four crews. Each one is an agent run with its own instructi
 
 The spec crew's criteria are posted on the job's issue and handed to every later crew, so everyone is held to the same definition of done.
 
+## The fast lane
+
+Four crews is a lot for a typo. A project can name its low-risk files in `anbiq.yml`:
+
+```yaml
+policy:
+  fast_lane:
+    paths: ['**/*.md', 'docs/**']
+    max_changed_lines: 200
+```
+
+- **QA is skipped** when a job's pull request only touches those paths and changes no more than `max_changed_lines` lines. The factory decides this from the pull request's files after every build, never from how the request is worded, so a revision that starts touching code gets QA again. A renamed file counts under both its old and new name.
+- **The spec crew is skipped** when the request starts with `quick:`, for example `quick: fix the typo in the README`. The build crew then works from the request itself. If the change turns out not to qualify, QA runs as usual and the thread is told.
+- The review crew always runs, and a person still approves the merge.
+
+Without `fast_lane`, every job runs every stage and `quick:` is an ordinary request.
+
 ## Loops and limits
 
 - QA or review failing sends the job back to build with their findings, up to `policy.max_bounces` times. After that the job is handed to a person.

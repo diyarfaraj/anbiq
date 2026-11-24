@@ -1,5 +1,5 @@
 export type Command =
-  | { type: 'request'; text: string }
+  | { type: 'request'; text: string; quick?: true }
   | { type: 'revise'; text: string }
   | { type: 'merge' }
   | { type: 'deploy'; environment: string }
@@ -10,6 +10,7 @@ export type CommandResult = { ok: true; command: Command } | { ok: false; error:
 
 const REVISE = /^revise\s*:\s*([\s\S]*)$/i;
 const DEPLOY = /^deploy(?:\s+(\S+))?$/i;
+const QUICK = /^quick\s*:\s*([\s\S]*)$/i;
 
 /**
  * Commands are exact so a request can never be mistaken for one: "merge" merges,
@@ -40,6 +41,19 @@ export function parseCommand(input: string): CommandResult {
     return environment
       ? { ok: true, command: { type: 'deploy', environment } }
       : { ok: false, error: 'deploy needs an environment, for example "deploy production"' };
+  }
+
+  // "quick: …" is still a request. It only asks for the short pipeline, which the factory
+  // grants when the project allows it and the change turns out to be low-risk.
+  const quick = QUICK.exec(message);
+  if (quick) {
+    const request = (quick[1] ?? '').trim();
+    return request.length > 0
+      ? { ok: true, command: { type: 'request', text: request, quick: true } }
+      : {
+          ok: false,
+          error: 'quick needs a request, for example "quick: fix the typo in the README"',
+        };
   }
 
   return { ok: true, command: { type: 'request', text: message } };

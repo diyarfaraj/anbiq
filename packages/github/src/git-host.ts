@@ -1,4 +1,10 @@
-import { HeadMovedError, MergeRefusedError, type GitHost, type PullRequestRef } from '@anbiq/core';
+import {
+  HeadMovedError,
+  MergeRefusedError,
+  type ChangedFile,
+  type GitHost,
+  type PullRequestRef,
+} from '@anbiq/core';
 import { GitHubClient, GitHubError, type RepositoryOptions } from './client.js';
 
 export interface GitHubGitHostOptions extends RepositoryOptions {
@@ -68,6 +74,19 @@ export class GitHubGitHost implements GitHost {
     const statusesGreen = statuses.total_count === 0 || statuses.state === 'success';
     const anything = checks.total_count + statuses.total_count > 0;
     return { checksPassed: anything && checksGreen && statusesGreen, headSha, status };
+  }
+
+  async changedFiles(pr: PullRequestRef): Promise<ChangedFile[]> {
+    const files = await this.client.repoList<{
+      filename: string;
+      previous_filename?: string;
+      changes: number;
+    }>(`/pulls/${pr.id}/files`);
+    return files.map((file) => ({
+      path: file.filename,
+      ...(file.previous_filename ? { previousPath: file.previous_filename } : {}),
+      changedLines: file.changes,
+    }));
   }
 
   /** Squash-merges, pinned to the reviewed commit: GitHub refuses if the head has moved. */

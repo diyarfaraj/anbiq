@@ -1,6 +1,7 @@
 import { canAcceptJob, canStartRun } from './budget.js';
 import { commandText, parseCommand, type Command } from './command.js';
 import type { AnbiqConfig } from './config.js';
+import { fastLaneVerdict } from './fast-lane.js';
 import { findPerson, hasRole, type Person } from './identity.js';
 import { createJob, settle, transition } from './job.js';
 import { decide, type PullRequestState } from './policy.js';
@@ -315,7 +316,7 @@ export function createFactory(deps: FactoryDeps): Factory {
   ) {
     switch (command.type) {
       case 'request':
-        return startJob(command.text, person, thread);
+        return startJob(command.text, person, thread, command.quick === true);
       case 'status':
         return reply(thread, job ? statusOf(job) : await projectStatus());
       case 'revise':
@@ -329,7 +330,12 @@ export function createFactory(deps: FactoryDeps): Factory {
     }
   }
 
-  async function startJob(request: string, person: Person, thread: ThreadRef): Promise<void> {
+  async function startJob(
+    request: string,
+    person: Person,
+    thread: ThreadRef,
+    askedForQuick: boolean,
+  ): Promise<void> {
     const budget = canAcceptJob(await store.usage(now()), config.budgets);
     if (!budget.ok) {
       await emit({ kind: 'budget.exceeded', actor: { type: 'system' }, summary: budget.reason });
@@ -337,6 +343,9 @@ export function createFactory(deps: FactoryDeps): Factory {
       return;
     }
 
+    // The short pipeline is the project's choice to offer: without a fast lane, "quick:" is
+    // an ordinary request.
+    const quick = askedForQuick && config.policy.fast_lane !== undefined;
     const short = newId().replace(/-/g, '').slice(0, 8);
     const id = `${config.project}-${short}`;
     const title = titleOf(request);
@@ -359,6 +368,7 @@ export function createFactory(deps: FactoryDeps): Factory {
       branch: `anbiq/${short}`,
       issue,
       bounces: 0,
+      ...(quick ? { quick } : {}),
     };
     await store.save(job);
     await emit({
@@ -371,9 +381,16 @@ export function createFactory(deps: FactoryDeps): Factory {
     });
     await reply(thread, {
       title: `Started ${id}: ${title}`,
+      ...(askedForQuick
+        ? {
+            body: quick
+              ? 'Quick: going straight to build, without a spec. QA is skipped only if the change turns out to be low-risk.'
+              : 'Quick is not switched on for this project (policy.fast_lane), so every stage runs.',
+          }
+        : {}),
       links: [{ label: 'Issue', url: issue.url }],
     });
-    await startStage(job, 'spec');
+    await startStage(job, quick ? 'build' : 'spec');
   }
 
   async function answer(job: JobRecord, person: Person, text: string): Promise<void> {
@@ -661,7 +678,7 @@ export function createFactory(deps: FactoryDeps): Factory {
             links: { pr: pr.url },
           });
         }
-        await startStage(current, 'qa');
+        await startStage(current, (await maySkipQa(current)) ? 'review' : 'qa');
         return;
       }
       case 'qa':
@@ -701,6 +718,42 @@ export function createFactory(deps: FactoryDeps): Factory {
     }
   }
 
+  /**
+   * A change that only touches the project's fast-lane paths, and is small, goes from build
+   * straight to review. The decision is made from the pull request's files, so it holds for
+   * every attempt: a revision that starts touching code gets QA again.
+   */
+  async function maySkipQa(job: JobRecord): Promise<boolean> {
+    const lane = config.policy.fast_lane;
+    if (!lane || !job.pullRequest || !gitHost.changedFiles) return false;
+    let verdict;
+    try {
+      verdict = fastLaneVerdict(await gitHost.changedFiles(job.pullRequest), lane);
+    } catch {
+      // Not knowing what changed is a reason to test it, not to skip the test.
+      return false;
+    }
+    if (verdict.ok) {
+      if (job.issue) {
+        await tracker.comment(
+          job.issue,
+          `QA skipped: the change only touches fast-lane files (${verdict.files} file${verdict.files === 1 ? '' : 's'}, ${verdict.changedLines} changed lines). Review still runs.`,
+        );
+      }
+      return true;
+    }
+    if (job.quick) {
+      if (job.issue) {
+        await tracker.comment(job.issue, `Not a fast-lane change: ${verdict.reason}. QA runs.`);
+      }
+      await reply(job.thread, {
+        title: `${job.id} is not a quick change after all`,
+        body: `${capitalise(verdict.reason)}, so QA runs before review.`,
+      });
+    }
+    return false;
+  }
+
   function statusOf(job: JobRecord): OutboundMessage {
     const fields = [
       { label: 'Stage', value: job.stage },
@@ -735,6 +788,10 @@ export function createFactory(deps: FactoryDeps): Factory {
   }
 
   return { handleHttp, handleMessage, handleRunResult, reconcile };
+}
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function titleOf(request: string): string {

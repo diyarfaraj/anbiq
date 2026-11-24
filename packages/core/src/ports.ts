@@ -1,5 +1,6 @@
 import type { AnbiqConfig } from './config.js';
 import type { Usage } from './budget.js';
+import type { ChangedFile } from './fast-lane.js';
 import type { Job } from './job.js';
 import type { Stage } from './stage.js';
 
@@ -118,6 +119,11 @@ export interface GitHost {
    * MergeRefusedError when the host's own rules do not allow the merge.
    */
   merge(pr: PullRequestRef, expectedHeadSha: string): Promise<void>;
+  /**
+   * Every file the pull request changes against its base. Optional: without it no change
+   * qualifies for `policy.fast_lane`.
+   */
+  changedFiles?(pr: PullRequestRef): Promise<ChangedFile[]>;
 }
 
 /** The git host refused the merge, for example because the branch needs an approving review. */
@@ -225,6 +231,8 @@ export interface JobRecord extends Job {
   resumeStage?: CrewStage;
   /** The acceptance criteria from the spec crew, handed to every later crew. */
   spec?: string;
+  /** The person asked for the short pipeline ("quick: …") and the project allows it. */
+  quick?: boolean;
 }
 
 export interface JobStore {

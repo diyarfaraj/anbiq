@@ -12,9 +12,10 @@ export interface Job {
 }
 
 const TRANSITIONS: Record<Stage, readonly Stage[]> = {
-  intake: ['spec', 'blocked', 'cancelled'],
+  // A quick job goes from intake straight to build, and a low-risk change from build to review.
+  intake: ['spec', 'build', 'blocked', 'cancelled'],
   spec: ['build', 'blocked', 'cancelled'],
-  build: ['qa', 'blocked', 'cancelled'],
+  build: ['qa', 'review', 'blocked', 'cancelled'],
   qa: ['review', 'build', 'blocked', 'cancelled'],
   review: ['awaiting-approval', 'build', 'blocked', 'cancelled'],
   'awaiting-approval': ['merged', 'build', 'cancelled'],

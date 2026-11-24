@@ -2,6 +2,7 @@ import {
   HeadMovedError,
   MergeRefusedError,
   type AgentEngine,
+  type ChangedFile,
   type CrewStage,
   type Deployer,
   type EngineInvocation,
@@ -81,6 +82,7 @@ export class FakeGitHost implements GitHost {
       merged: boolean;
       closed: boolean;
       refusal?: string;
+      files: ChangedFile[] | Error;
     }
   >();
 
@@ -97,6 +99,7 @@ export class FakeGitHost implements GitHost {
       headSha: 'initial',
       merged: false,
       closed: false,
+      files: [],
     });
     return { id, url: `https://git.test/pulls/${id}` };
   }
@@ -119,6 +122,17 @@ export class FakeGitHost implements GitHost {
     if (state.headSha !== expectedHeadSha) throw new HeadMovedError(expectedHeadSha, state.headSha);
     if (state.refusal !== undefined) throw new MergeRefusedError(state.refusal);
     state.merged = true;
+  }
+
+  async changedFiles(pr: PullRequestRef): Promise<ChangedFile[]> {
+    const { files } = this.pr(pr.id);
+    if (files instanceof Error) throw files;
+    return structuredClone(files);
+  }
+
+  /** What the pull request changes against its base, or an error to answer with. */
+  setFiles(prId: string, files: ChangedFile[] | Error): void {
+    this.pr(prId).files = files;
   }
 
   /** Simulates a branch rule that stops the merge, such as a required review. */
