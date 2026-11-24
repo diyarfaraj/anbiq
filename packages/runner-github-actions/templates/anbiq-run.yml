@@ -101,6 +101,10 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
+          # The factory dispatches this workflow as a GitHub App, which the action treats as a bot and
+          # refuses by default. Allowing bots is safe here: workflow_dispatch is the only trigger, and
+          # only an actor with write access to this repository can dispatch it.
+          allowed_bots: '*'
           prompt: ${{ steps.prepare.outputs.prompt }}
           settings: ${{ steps.prepare.outputs.settings }}
           claude_args: ${{ steps.prepare.outputs.args }}
