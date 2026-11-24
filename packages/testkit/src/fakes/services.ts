@@ -1,5 +1,6 @@
 import {
   HeadMovedError,
+  MergeRefusedError,
   type AgentEngine,
   type CrewStage,
   type Deployer,
@@ -26,6 +27,7 @@ export class FakeTracker implements Tracker {
     { jobId: string; title: string; body: string; stage?: Stage; comments: string[] }
   >();
   private readonly claims = new Map<string, string>();
+  private readonly closed = new Set<string>();
 
   async createJob(input: { jobId: string; title: string; body: string }): Promise<IssueRef> {
     const id = String(this.issues.size + 1);
@@ -52,6 +54,16 @@ export class FakeTracker implements Tracker {
     if (this.claims.get(issue.id) === runId) this.claims.delete(issue.id);
   }
 
+  async isOpen(issue: IssueRef): Promise<boolean> {
+    this.issue(issue);
+    return !this.closed.has(issue.id);
+  }
+
+  /** Simulates a person closing the issue on the tracker. */
+  close(issueId: string): void {
+    this.closed.add(issueId);
+  }
+
   private issue(ref: IssueRef) {
     const issue = this.issues.get(ref.id);
     if (!issue) throw new Error(`unknown issue ${ref.id}`);
@@ -62,7 +74,14 @@ export class FakeTracker implements Tracker {
 export class FakeGitHost implements GitHost {
   readonly pullRequests = new Map<
     string,
-    { branch: string; checksPassed: boolean; headSha: string; merged: boolean }
+    {
+      branch: string;
+      checksPassed: boolean;
+      headSha: string;
+      merged: boolean;
+      closed: boolean;
+      refusal?: string;
+    }
   >();
 
   async openPullRequest(input: {
@@ -77,19 +96,43 @@ export class FakeGitHost implements GitHost {
       checksPassed: false,
       headSha: 'initial',
       merged: false,
+      closed: false,
     });
     return { id, url: `https://git.test/pulls/${id}` };
   }
 
-  async pullRequestState(pr: PullRequestRef): Promise<{ checksPassed: boolean; headSha: string }> {
+  async pullRequestState(pr: PullRequestRef): Promise<{
+    checksPassed: boolean;
+    headSha: string;
+    status: 'open' | 'merged' | 'closed';
+  }> {
     const state = this.pr(pr.id);
-    return { checksPassed: state.checksPassed, headSha: state.headSha };
+    return {
+      checksPassed: state.checksPassed,
+      headSha: state.headSha,
+      status: state.merged ? 'merged' : state.closed ? 'closed' : 'open',
+    };
   }
 
   async merge(pr: PullRequestRef, expectedHeadSha: string): Promise<void> {
     const state = this.pr(pr.id);
     if (state.headSha !== expectedHeadSha) throw new HeadMovedError(expectedHeadSha, state.headSha);
+    if (state.refusal !== undefined) throw new MergeRefusedError(state.refusal);
     state.merged = true;
+  }
+
+  /** Simulates a branch rule that stops the merge, such as a required review. */
+  refuse(prId: string, reason: string | undefined): void {
+    const state = this.pr(prId);
+    if (reason === undefined) delete state.refusal;
+    else state.refusal = reason;
+  }
+
+  /** Simulates a person merging or closing the pull request on the git host. */
+  finishOutside(prId: string, how: 'merged' | 'closed'): void {
+    const state = this.pr(prId);
+    if (how === 'merged') state.merged = true;
+    else state.closed = true;
   }
 
   /** Simulates a push to the pull request's branch and the checks that follow. */
@@ -192,6 +235,13 @@ export class MemoryJobStore implements JobStore {
     return [...this.jobs.values()]
       .filter((job) => job.queued !== undefined)
       .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+      .map((job) => structuredClone(job));
+  }
+
+  async listUnfinished(): Promise<JobRecord[]> {
+    return [...this.jobs.values()]
+      .filter((job) => !['merged', 'deployed', 'cancelled'].includes(job.stage))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map((job) => structuredClone(job));
   }
 

@@ -57,6 +57,20 @@ export function createJob(input: {
   };
 }
 
+const FINISHED: readonly Stage[] = ['merged', 'deployed', 'cancelled'];
+
+/**
+ * Records that a job ended outside the factory: a person merged its pull request, or closed it
+ * or its issue, on the host. That is a fact to record and not a step the factory chose, so it
+ * is not bound by the transitions above. A job that already finished stays as it is.
+ */
+export function settle(job: Job, to: 'merged' | 'cancelled', at: string): Job {
+  if (FINISHED.includes(job.stage)) {
+    throw new InvalidTransitionError(job.stage, to);
+  }
+  return { ...job, stage: to, updatedAt: at };
+}
+
 /** Returns the job in its new stage. Moving from awaiting-approval back to build counts as a revision. */
 export function transition(job: Job, to: Stage, at: string): Job {
   if (!canTransition(job.stage, to)) {

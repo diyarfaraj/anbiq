@@ -2,10 +2,11 @@ import { canAcceptJob, canStartRun } from './budget.js';
 import { commandText, parseCommand, type Command } from './command.js';
 import type { AnbiqConfig } from './config.js';
 import { findPerson, hasRole, type Person } from './identity.js';
-import { createJob, transition } from './job.js';
+import { createJob, settle, transition } from './job.js';
 import { decide, type PullRequestState } from './policy.js';
 import {
   HeadMovedError,
+  MergeRefusedError,
   type AgentEngine,
   type CrewStage,
   type Deployer,
@@ -53,9 +54,16 @@ export interface Factory {
   handleMessage(message: InboundMessage): Promise<void>;
   /** Moves a job on when a runner reports that a run ended. */
   handleRunResult(result: RunResult): Promise<void>;
+  /**
+   * Finishes jobs whose pull request was merged or closed, or whose issue was closed, outside
+   * the factory. Call it on a timer; it is also done for a job whenever a message arrives in
+   * its thread.
+   */
+  reconcile(): Promise<void>;
 }
 
 const CONFIRM_WORDS = ['yes', 'confirm'];
+const FINISHED: readonly Stage[] = ['merged', 'deployed', 'cancelled'];
 const COMMAND_HELP =
   'Reply with revise: <feedback>, merge, deploy <environment>, status or cancel, or start a new thread for new work.';
 
@@ -79,7 +87,11 @@ export function createFactory(deps: FactoryDeps): Factory {
   }
 
   async function moveTo(job: JobRecord, stage: Stage): Promise<JobRecord> {
-    const moved: JobRecord = { ...job, ...transition(job, stage, now()) };
+    return entered({ ...job, ...transition(job, stage, now()) });
+  }
+
+  async function entered(moved: JobRecord): Promise<JobRecord> {
+    const stage = moved.stage;
     if (moved.issue) await tracker.setStage(moved.issue, stage);
     await emit({
       kind: 'stage.entered',
@@ -193,7 +205,22 @@ export function createFactory(deps: FactoryDeps): Factory {
       return;
     }
 
+    try {
+      await handleFrom(person, message);
+    } catch (error) {
+      // The person must not be left guessing. The error itself goes to the server log.
+      await reply(message.thread, {
+        title: 'Not done: something went wrong while handling that message',
+        body: 'Nothing else will happen with it. The server log has the details.',
+      }).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function handleFrom(person: Person, message: InboundMessage): Promise<void> {
     const job = await store.findByThread(message.thread);
+    // If the job was finished on the tracker or git host directly, say so and stop there.
+    if (job && (await catchUp(job))) return;
     let text = message.text;
     let confirmed = false;
     if (job?.pendingConfirmation && CONFIRM_WORDS.includes(text.trim().toLowerCase())) {
@@ -390,6 +417,20 @@ export function createFactory(deps: FactoryDeps): Factory {
         });
         return;
       }
+      if (error instanceof MergeRefusedError) {
+        await emit({
+          kind: 'approval.rejected',
+          job: job.id,
+          actor: { type: 'system' },
+          summary: `merge refused: ${error.reason}`,
+        });
+        await reply(job.thread, {
+          title: `Not merged: ${error.reason}`,
+          body: 'Sort that out on the pull request, then reply merge again.',
+          links: [{ label: 'Pull request', url: job.pullRequest!.url }],
+        });
+        return;
+      }
       throw error;
     }
     const merged = await moveTo(job, 'merged');
@@ -455,6 +496,72 @@ export function createFactory(deps: FactoryDeps): Factory {
     await store.save(cancelled);
     await reply(job.thread, { title: `Cancelled ${job.id}`, body: `Cancelled by ${person.name}.` });
     await drainQueue();
+  }
+
+  /**
+   * Catches a job up with what people did on the tracker and git host directly. Returns true
+   * when that finished the job.
+   */
+  async function catchUp(job: JobRecord): Promise<boolean> {
+    if (FINISHED.includes(job.stage)) return false;
+    if (job.pullRequest) {
+      const { status } = await gitHost.pullRequestState(job.pullRequest);
+      if (status === 'merged') {
+        await finishOutside(job, 'merged', 'its pull request was merged');
+        return true;
+      }
+      if (status === 'closed') {
+        await finishOutside(job, 'cancelled', 'its pull request was closed without merging');
+        return true;
+      }
+    }
+    if (job.issue && tracker.isOpen && !(await tracker.isOpen(job.issue))) {
+      await finishOutside(job, 'cancelled', 'its issue was closed');
+      return true;
+    }
+    return false;
+  }
+
+  async function finishOutside(
+    job: JobRecord,
+    stage: 'merged' | 'cancelled',
+    why: string,
+  ): Promise<void> {
+    const cleared = { ...(await stopActiveRun(job)) };
+    delete cleared.queued;
+    delete cleared.pendingConfirmation;
+    delete cleared.resumeStage;
+    const finished = await entered({ ...cleared, ...settle(cleared, stage, now()) });
+    await store.save(finished);
+    const links = job.pullRequest ? [{ label: 'Pull request', url: job.pullRequest.url }] : [];
+    if (stage === 'merged') {
+      await emit({
+        kind: 'merged',
+        job: job.id,
+        actor: { type: 'system' },
+        summary: 'merged outside the factory',
+        ...(job.pullRequest ? { links: { pr: job.pullRequest.url } } : {}),
+      });
+    }
+    await reply(job.thread, {
+      title: stage === 'merged' ? `${job.id} is merged` : `${job.id} is cancelled`,
+      body: `Anbiq noticed that ${why} outside the factory.`,
+      ...(links.length > 0 ? { links } : {}),
+    });
+    await drainQueue();
+  }
+
+  async function reconcile(): Promise<void> {
+    let failure: unknown;
+    for (const job of await store.listUnfinished()) {
+      try {
+        await catchUp(job);
+      } catch (error) {
+        // One unreachable issue must not stop the others from being checked.
+        failure ??= error;
+      }
+    }
+    if (failure !== undefined) throw failure;
   }
 
   async function handleRunResult(result: RunResult): Promise<void> {
@@ -627,7 +734,7 @@ export function createFactory(deps: FactoryDeps): Factory {
     };
   }
 
-  return { handleHttp, handleMessage, handleRunResult };
+  return { handleHttp, handleMessage, handleRunResult, reconcile };
 }
 
 function titleOf(request: string): string {

@@ -67,6 +67,11 @@ export class GitHubTracker implements Tracker {
     }
   }
 
+  async isOpen(issue: IssueRef): Promise<boolean> {
+    const found = await this.client.repo<{ state: string }>('GET', `/issues/${issue.id}`);
+    return found.state === 'open';
+  }
+
   private async earliestClaim(issue: IssueRef) {
     const claims = await this.activeClaims(issue);
     return claims.sort((a, b) => a.commentId - b.commentId)[0];

@@ -117,6 +117,17 @@ export class SqliteJobStore implements JobStore {
     return rows.map((row) => JSON.parse(row.data) as JobRecord);
   }
 
+  async listUnfinished(): Promise<JobRecord[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT data FROM jobs
+         WHERE json_extract(data, '$.stage') NOT IN ('merged', 'deployed', 'cancelled')
+         ORDER BY created_at, rowid`,
+      )
+      .all() as { data: string }[];
+    return rows.map((row) => JSON.parse(row.data) as JobRecord);
+  }
+
   /** The most recently updated jobs, newest first. Not part of the JobStore port; for the board. */
   listRecent(limit: number): JobRecord[] {
     const rows = this.db

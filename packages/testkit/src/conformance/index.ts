@@ -251,6 +251,16 @@ export function describeJobStoreConformance(name: string, setup: () => JobStore)
       expect((await store.listQueued()).map((job) => job.id)).toEqual(['early', 'late']);
     });
 
+    it('lists unfinished jobs oldest first', async () => {
+      const store = setup();
+      await store.save(record('blocked', '2026-11-23T09:00:00Z', { stage: 'blocked' }));
+      await store.save(record('building', '2026-11-23T08:00:00Z', { stage: 'build' }));
+      await store.save(record('merged', '2026-11-23T07:00:00Z', { stage: 'merged' }));
+      await store.save(record('deployed', '2026-11-23T06:00:00Z', { stage: 'deployed' }));
+      await store.save(record('cancelled', '2026-11-23T05:00:00Z', { stage: 'cancelled' }));
+      expect((await store.listUnfinished()).map((job) => job.id)).toEqual(['building', 'blocked']);
+    });
+
     it('claims each delivered message only once', async () => {
       const store = setup();
       expect(await store.claimMessage('slack:C1:1700000000.0001')).toBe(true);
