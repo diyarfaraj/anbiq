@@ -30,11 +30,12 @@ export function textMessage(input: {
   messageId?: number;
   replyTo?: number;
   isBot?: boolean;
+  chatType?: string;
 }): Record<string, unknown> {
   return {
     message_id: input.messageId ?? ++nextId,
     from: { id: Number(input.userId.replace(/\D/g, '') || 1), is_bot: input.isBot ?? false },
-    chat: { id: Number(input.chat) },
+    chat: { id: Number(input.chat), type: input.chatType ?? 'supergroup' },
     date: Math.floor(NOW.getTime() / 1000),
     text: input.text,
     ...(input.replyTo === undefined ? {} : { reply_to_message: { message_id: input.replyTo } }),
