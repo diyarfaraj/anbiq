@@ -1,6 +1,6 @@
 {
   "name": "@anbiq/server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The Anbiq server: chat webhooks in, runner callbacks back, jobs kept in SQLite.",
   "license": "MIT",
   "author": "Diyar Faraj",

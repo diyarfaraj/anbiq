@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-import { createServer } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import { buildApp, loadSettings, StartupError } from './app.js';
 import { createBoard } from './board.js';
+import { createDemo, demoSecret } from './demo.js';
 import { createHandler } from './http.js';
-import { errorFields, jsonLogger } from './log.js';
+import { errorFields, jsonLogger, type Logger } from './log.js';
+import type { SerialQueue } from './queue.js';
+import type { SqliteDatabase } from './sqlite.js';
 
 const logger = jsonLogger();
 
@@ -54,28 +57,78 @@ function start(): void {
       enabled: app.config.enabled,
     });
   });
+  stopOnSignals(server, app.queue, app.database, logger);
+}
 
+/** The real factory with a simulated outside world, on this machine only, for trying the board. */
+function startDemo(): void {
+  const quiet: Logger = {
+    log: (level, message, fields) => {
+      if (level === 'error') logger.log(level, message, fields);
+    },
+  };
+  const demo = createDemo({ logger: quiet });
+  const secret = demoSecret();
+  const server = createServer(
+    createHandler({
+      factory: demo.factory,
+      queue: demo.queue,
+      callbackSecret: secret,
+      logger: quiet,
+      board: createBoard({
+        password: secret,
+        sessionSecret: secret,
+        config: demo.config,
+        store: demo.store,
+        events: demo.events,
+        logger: quiet,
+        demo: true,
+      }),
+    }),
+  );
+  const port = Number(process.env.PORT ?? 8080);
+  server.listen(port, '127.0.0.1', () => {
+    process.stdout.write(
+      `Anbiq demo: the real factory with simulated chat, GitHub and crews.\n` +
+        `Open http://localhost:${port}/board (this machine only). Ctrl+C to stop.\n`,
+    );
+    demo.start();
+  });
+  stopOnSignals(server, demo.queue, demo.database, logger, () => demo.stop());
+}
+
+function stopOnSignals(
+  server: Server,
+  queue: SerialQueue,
+  database: SqliteDatabase,
+  log: Logger,
+  beforeClose?: () => void,
+): void {
   let stopping = false;
   const stop = (signal: string) => {
     if (stopping) return;
     stopping = true;
-    logger.log('info', 'stopping', { signal });
+    log.log('info', 'stopping', { signal });
+    beforeClose?.();
     server.close(() => {
-      void app.queue
+      void queue
         .idle()
         .catch(() => undefined)
         .finally(() => {
-          app.database.close();
+          database.close();
           process.exit(0);
         });
     });
+    // Live board streams never end on their own.
+    server.closeAllConnections();
     setTimeout(() => process.exit(1), 25_000).unref();
   };
   process.on('SIGTERM', () => stop('SIGTERM'));
   process.on('SIGINT', () => stop('SIGINT'));
   process.on('unhandledRejection', (error) =>
-    logger.log('error', 'unhandled rejection', errorFields(error)),
+    log.log('error', 'unhandled rejection', errorFields(error)),
   );
 }
 
-start();
+if (process.argv.includes('--demo')) startDemo();
+else start();

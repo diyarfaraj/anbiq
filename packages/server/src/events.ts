@@ -38,6 +38,16 @@ export class SqliteEventSink implements EventSink {
     );
   }
 
+  /** How many events of one kind happened since `since`. */
+  countSince(kind: FactoryEvent['kind'], since: string): number {
+    const row = this.database.db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM events WHERE at >= ? AND json_extract(data, '$.kind') = ?",
+      )
+      .get(since, kind) as { n: number };
+    return row.n;
+  }
+
   subscribe(listener: (event: FactoryEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
