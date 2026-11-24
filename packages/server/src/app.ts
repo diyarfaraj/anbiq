@@ -1,5 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { createFactory, parseConfig, type AnbiqConfig, type Factory, type Tap } from '@anbiq/core';
+import {
+  createFactory,
+  parseConfig,
+  type AgentEngine,
+  type AnbiqConfig,
+  type Factory,
+  type Tap,
+} from '@anbiq/core';
 import { ClaudeCodeEngine } from '@anbiq/engine-claude-code';
 import { GitHubAppAuth, GitHubGitHost, GitHubTracker, type TokenProvider } from '@anbiq/github';
 import { GitHubActionsRunner } from '@anbiq/runner-github-actions';
@@ -40,13 +47,21 @@ const envSchema = z.object({
 
 export type Settings = z.infer<typeof envSchema>;
 
+/**
+ * The agent engines a factory can run its crews on, by the ID used in anbiq.yml. A new engine
+ * is added here, and as a step in the runner's workflow.
+ */
+const ENGINES: Record<string, () => AgentEngine> = {
+  'claude-code': () => new ClaudeCodeEngine(),
+};
+
 /** What each supported slot value is called in anbiq.yml. */
-const SUPPORTED = {
+const SUPPORTED: Record<'tracker' | 'git_host' | 'runner' | 'engine', readonly string[]> = {
   tracker: ['github-issues'],
   git_host: ['github'],
   runner: ['github-actions'],
-  engine: ['claude-code'],
-} as const;
+  engine: Object.keys(ENGINES),
+};
 
 export interface App {
   factory: Factory;
@@ -86,7 +101,7 @@ export function loadSettings(env: NodeJS.ProcessEnv): { settings: Settings; conf
     ['engine', config.engine.id],
   ];
   for (const [slot, value] of slots) {
-    const supported: readonly string[] = SUPPORTED[slot];
+    const supported = SUPPORTED[slot];
     if (!supported.includes(value)) {
       problems.push(`anbiq.yml ${slot} "${value}" is not supported; use ${supported.join(', ')}`);
     }
@@ -151,7 +166,8 @@ export function buildApp(
       workflow: settings.ANBIQ_WORKFLOW,
       ref: settings.ANBIQ_BASE_BRANCH,
     }),
-    engine: new ClaudeCodeEngine(),
+    // loadSettings has already refused an engine that is not in the list.
+    engine: ENGINES[config.engine.id]!(),
     store,
     defer: (task) => queue.defer(task, 'message'),
     ...(options.now ? { now: options.now } : {}),

@@ -21,6 +21,14 @@ describe('budgets', () => {
     expect(canStartRun(spent, budgets).ok).toBe(false);
   });
 
+  it('counts only jobs when no daily spend is set, as for an engine that reports no cost', () => {
+    const jobsOnly = { jobs_per_day: 10, concurrent_jobs: 1 };
+    const spent = { usdToday: 900, jobsToday: 9, runningJobs: 0 };
+    expect(canAcceptJob(spent, jobsOnly)).toEqual({ ok: true });
+    expect(canStartRun(spent, jobsOnly)).toEqual({ ok: true });
+    expect(canAcceptJob({ ...spent, jobsToday: 10 }, jobsOnly).ok).toBe(false);
+  });
+
   it('queues runs beyond the concurrency limit without refusing the job', () => {
     const busy = { usdToday: 0, jobsToday: 1, runningJobs: 1 };
     expect(canAcceptJob(busy, budgets).ok).toBe(true);

@@ -1,4 +1,4 @@
-import type { CrewStage } from '@anbiq/core';
+import type { CrewStage } from './ports.js';
 
 /** What each crew is for, written as instructions to the agent. */
 export const CREW_INSTRUCTIONS: Record<CrewStage, string> = {

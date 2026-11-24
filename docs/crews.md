@@ -1,6 +1,6 @@
 # Crews
 
-A job passes through four crews. Each one is an agent run with its own instructions and its own tool permissions, prepared by the agent engine (see [`@anbiq/engine-claude-code`](../packages/engine-claude-code)).
+A job passes through four crews. Each one is an agent run with its own instructions and its own tool permissions, prepared by the agent engine. The instructions and the permissions are the same whichever engine runs them: they live in the core, and an engine such as [`@anbiq/engine-claude-code`](../packages/engine-claude-code) only translates the permissions into its agent's own settings.
 
 | Crew   | Job                                                                                                    | Can change code |
 | ------ | ------------------------------------------------------------------------------------------------------ | --------------- |

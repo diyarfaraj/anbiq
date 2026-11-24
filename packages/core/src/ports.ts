@@ -1,5 +1,5 @@
-import type { AnbiqConfig } from './config.js';
 import type { Usage } from './budget.js';
+import type { CrewPromptInput } from './crew.js';
 import type { ChangedFile } from './fast-lane.js';
 import type { Job } from './job.js';
 import type { Stage } from './stage.js';
@@ -157,9 +157,11 @@ export interface Deployer {
 export interface EngineInvocation {
   engine: string;
   prompt: string;
-  allowedTools: string[];
-  /** Tools the agent may never use, even if an allowed pattern would match. */
-  deniedTools?: string[];
+  /**
+   * The agent's own configuration, in the agent's own format: above all what the crew is
+   * permitted, translated from CrewPermissions. The runner hands it to the agent unread.
+   */
+  settings: Record<string, unknown>;
   maxTurns: number;
   timeoutMinutes: number;
   model?: string;
@@ -167,14 +169,7 @@ export interface EngineInvocation {
 
 export interface AgentEngine {
   readonly id: string;
-  prepare(input: {
-    stage: CrewStage;
-    request: string;
-    /** The acceptance criteria the spec crew wrote. Present from the build stage on. */
-    spec?: string;
-    feedback?: string;
-    config: AnbiqConfig;
-  }): EngineInvocation;
+  prepare(input: CrewPromptInput): EngineInvocation;
 }
 
 export interface RunSpec {
@@ -202,7 +197,8 @@ export interface RunResult {
   stage: CrewStage;
   outcome: 'passed' | 'failed' | 'needs-input';
   summary: string;
-  costUsd: number;
+  /** What the run cost. Left out when the agent does not report it. */
+  costUsd?: number;
   /** The commit the run left the branch at (build, qa, review). */
   headSha?: string;
   /** For needs-input: what the crew wants to know. */

@@ -63,7 +63,7 @@ const spec = {
   invocation: {
     engine: 'claude-code',
     prompt: 'Build it',
-    allowedTools: ['Read'],
+    settings: {},
     maxTurns: 5,
     timeoutMinutes: 5,
   },
@@ -173,6 +173,30 @@ describe('callbacks', () => {
   });
 });
 
+describe('a callback from an engine that reports no cost', () => {
+  const body = (costUsd?: unknown) =>
+    JSON.stringify({
+      runId: 'run-1',
+      jobId: 'acme-1',
+      stage: 'build',
+      outcome: 'passed',
+      summary: 'Done',
+      ...(costUsd === undefined ? {} : { costUsd }),
+    });
+
+  it('leaves the cost out rather than reporting it as zero', () => {
+    for (const sent of [body(), body(null)]) {
+      const parsed = parseCallback(sent, 'run-1');
+      expect(parsed.ok && 'costUsd' in parsed.result).toBe(false);
+    }
+  });
+
+  it('keeps a reported cost, including zero', () => {
+    const parsed = parseCallback(body(0), 'run-1');
+    expect(parsed.ok && parsed.result.costUsd).toBe(0);
+  });
+});
+
 describe('workflow template', () => {
   const source = readFileSync(new URL('../templates/anbiq-run.yml', import.meta.url), 'utf8');
   const workflow = parseYaml(source) as {
@@ -182,9 +206,11 @@ describe('workflow template', () => {
       {
         permissions: Record<string, string>;
         steps: {
+          name?: string;
           run?: string;
           env?: Record<string, string>;
           uses?: string;
+          if?: string;
           with?: Record<string, string>;
         }[];
       }
@@ -209,6 +235,19 @@ describe('workflow template', () => {
     const publish = workflow.jobs.publish!;
     expect(publish.permissions).toEqual({ contents: 'write' });
     expect(publish.steps.some((step) => step.uses?.startsWith('anthropics/'))).toBe(false);
+  });
+
+  it('runs each agent only for its own engine, and refuses an engine it has no step for', () => {
+    const steps = workflow.jobs.crew!.steps;
+    const agents = steps.filter((step) => /^Run the crew/.test(step.name ?? ''));
+    const engines = agents.map((step) => /^Run the crew \((.+)\)$/.exec(step.name ?? '')?.[1]);
+    expect(engines).toContain('claude-code');
+    for (const [index, step] of agents.entries()) {
+      expect(step.if).toBe(`steps.prepare.outputs.engine == '${engines[index]}'`);
+    }
+    const refusal = steps.find((step) => /^Refuse an engine/.test(step.name ?? ''))!;
+    expect(refusal.if).toContain(JSON.stringify(engines));
+    expect(refusal.run).toContain('exit 1');
   });
 
   it('starts from no permissions at the workflow level', () => {

@@ -190,7 +190,7 @@ export function describeRunnerConformance(name: string, setup: () => Runner): vo
       invocation: {
         engine: 'any',
         prompt: 'build it',
-        allowedTools: [],
+        settings: {},
         maxTurns: 5,
         timeoutMinutes: 5,
       },

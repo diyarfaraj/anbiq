@@ -51,7 +51,11 @@ const policySchema = z
 
 const budgetsSchema = z
   .object({
-    usd_per_day: z.number().positive(),
+    /**
+     * Left out, spend is not limited: use that for an engine that does not report what a run
+     * cost. The job limits below always apply.
+     */
+    usd_per_day: z.number().positive().optional(),
     jobs_per_day: z.number().int().positive(),
     concurrent_jobs: z.number().int().positive(),
   })

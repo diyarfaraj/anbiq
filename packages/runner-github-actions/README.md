@@ -15,8 +15,10 @@ Runs each Anbiq crew as a GitHub Actions workflow in the repository the factory 
 
 The workflow has two jobs, so the agent never holds write access or the factory's secrets:
 
-- **crew** checks out the job branch with a read-only token and no stored credentials, runs Claude Code with the tools the engine allowed, and uploads the result and a git bundle of any new commits.
+- **crew** checks out the job branch with a read-only token and no stored credentials, runs the agent with the settings the engine prepared, and uploads the result and a git bundle of any new commits.
 - **publish** runs no agent. It pushes the bundle to the job branch (only branches named `anbiq/…`), then signs the result with HMAC-SHA256 over `<timestamp>.<body>` and posts it to the factory.
+
+The workflow has one "Run the crew" step per agent engine, and `engine.id` in `anbiq.yml` decides which one runs. A run for an engine the workflow has no step for fails instead of falling back to another agent. A run reports what it cost when the agent says so; otherwise the cost is left out and the factory limits jobs only.
 
 Inputs and agent output reach shell steps only through environment variables, never by interpolation into scripts. Runs of the same job are serialised with a concurrency group.
 

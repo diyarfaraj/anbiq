@@ -51,6 +51,21 @@ describeTapConformance('SlackTap', () => {
 
 Conformance tests never call the real service. Fake the platform's HTTP API in the test, and keep any live smoke test in a separate file that only runs when its credentials are present.
 
+## Writing an agent engine
+
+An engine runs the crews on one coding agent. It has two halves:
+
+1. **A package** `packages/engine-<agent>` whose `prepare` returns the invocation. Take the prompt from `buildPrompt` in `@anbiq/core` unchanged, and build `settings` (the agent's own configuration, in the agent's own format) from `crewPermissions(stage, config.checks.verify)` and `FORBIDDEN`. Register the engine in `ENGINES` in `packages/server/src/app.ts`.
+2. **A step** in `packages/runner-github-actions/templates/anbiq-run.yml`, named `Run the crew (<engine id>)` and guarded by `if: steps.prepare.outputs.engine == '<engine id>'`. Add the ID to the list in the "Refuse an engine" step. The step installs and runs the agent with `steps.prepare.outputs.prompt` and `steps.prepare.outputs.settings`, and takes its API key from its own repository secret.
+
+The crew job is the security boundary, so an engine is only acceptable if its agent enforces all of this, and its tests prove the translation:
+
+- Anything `crewPermissions` does not grant is refused, not asked about. Nobody is there to answer a prompt.
+- Everything in `FORBIDDEN` is denied even where an allowed pattern would match: pushing, git remotes and config, network tools, printing the environment, reading `.env` files, editing CI workflows.
+- Configuration inside the repository (the agent's own config files, plugins, extra tools) cannot widen the permissions. The repository is what the crew edits, so it is not trusted to configure the agent.
+
+If the agent reports what a run cost, write it to `costUsd` in the "Package the result" step. If it does not, leave it null and tell users to leave `budgets.usd_per_day` out: the factory then limits jobs per day and concurrent jobs only.
+
 ## Rules every adapter follows
 
 - **Verify before reading.** A tap checks the platform's signature (and timestamp, where the platform provides one) in `verify`, and `parse` never runs on an unverified request.
