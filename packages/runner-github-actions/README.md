@@ -7,6 +7,7 @@ Runs each Anbiq crew as a GitHub Actions workflow in the repository the factory 
 1. Copy [`templates/anbiq-run.yml`](templates/anbiq-run.yml) to `.github/workflows/anbiq-run.yml` on the base branch.
 2. Add the secrets and variable under Settings → Secrets and variables → Actions:
    - secret `ANTHROPIC_API_KEY`: the key the crews run on. To run them on a Claude subscription instead, set the secret `CLAUDE_CODE_OAUTH_TOKEN` to the token printed by `claude setup-token`; when both are set, the subscription token is used;
+   - to run the crews on another provider through OpenCode instead, see [`@anbiq/engine-opencode`](../engine-opencode) for the secret to add;
    - secret `ANBIQ_CALLBACK_SECRET`: a long random string, the same one the factory is given;
    - variable `ANBIQ_CALLBACK_URL`: the factory's public base URL. Results are posted to `<url>/runs/<run id>`.
 3. Give the factory's GitHub App the **Actions: read and write** permission, so it can dispatch and cancel runs.
@@ -18,7 +19,7 @@ The workflow has two jobs, so the agent never holds write access or the factory'
 - **crew** checks out the job branch with a read-only token and no stored credentials, runs the agent with the settings the engine prepared, and uploads the result and a git bundle of any new commits.
 - **publish** runs no agent. It pushes the bundle to the job branch (only branches named `anbiq/…`), then signs the result with HMAC-SHA256 over `<timestamp>.<body>` and posts it to the factory.
 
-The workflow has one "Run the crew" step per agent engine, and `engine.id` in `anbiq.yml` decides which one runs. A run for an engine the workflow has no step for fails instead of falling back to another agent. A run reports what it cost when the agent says so; otherwise the cost is left out and the factory limits jobs only.
+The workflow has one "Run the crew" step per agent engine, and `engine.id` in `anbiq.yml` decides which one runs. A run for an engine the workflow has no step for fails instead of falling back to another agent. Whatever the agent allowed, a run whose commits change `.github/workflows/` is failed and its commits are discarded. A run reports what it cost when the agent says so; otherwise the cost is left out and the factory limits jobs only.
 
 Inputs and agent output reach shell steps only through environment variables, never by interpolation into scripts. Runs of the same job are serialised with a concurrency group.
 

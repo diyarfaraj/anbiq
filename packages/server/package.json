@@ -41,6 +41,7 @@
   "dependencies": {
     "@anbiq/core": "workspace:*",
     "@anbiq/engine-claude-code": "workspace:*",
+    "@anbiq/engine-opencode": "workspace:*",
     "@anbiq/github": "workspace:*",
     "@anbiq/runner-github-actions": "workspace:*",
     "@anbiq/tap-discord": "workspace:*",

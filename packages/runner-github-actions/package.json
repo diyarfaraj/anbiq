@@ -40,6 +40,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@anbiq/engine-opencode": "workspace:*",
     "@anbiq/testkit": "workspace:*",
     "yaml": "^2.9.1"
   },
