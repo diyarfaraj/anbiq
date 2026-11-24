@@ -147,7 +147,7 @@ The exact definitions live in [`packages/core/src/ports.ts`](../packages/core/sr
 - **A request** in a new thread creates a job and an issue, then starts the spec crew.
 - **When a run ends:**
   - spec passes → build;
-  - build passes → a pull request is opened (once), then QA;
+  - build passes → a pull request is opened (once), then QA, or straight to review when the change qualifies for `policy.fast_lane`;
   - QA passes → review;
   - review passes → awaiting approval, recording the commit it reviewed.
 - **Failures:**
@@ -221,6 +221,9 @@ policy:
   confirm_commands: ['deploy production'] # asks for a second confirmation
   deploy_environments: [staging, production]
   max_revisions: 3 # then a person takes over
+  fast_lane: # optional; left out, every job runs every stage
+    paths: ['**/*.md', 'docs/**'] # low-risk files
+    max_changed_lines: 200
 budgets:
   usd_per_day: 25
   jobs_per_day: 10

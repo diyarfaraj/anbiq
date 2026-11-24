@@ -19,6 +19,10 @@ export function fakeGitHub() {
       refusal?: string;
     }
   >();
+  const files = new Map<
+    number,
+    { filename: string; previous_filename?: string; changes: number }[]
+  >();
   const checks = new Map<string, { status: string; conclusion: string | null }[]>();
   const statuses = new Map<string, string[]>();
   const requests: { method: string; path: string; auth: string | undefined }[] = [];
@@ -114,6 +118,10 @@ export function fakeGitHub() {
       pr.state = 'closed';
       return json(200, { merged: true, sha: 'merge-sha' });
     }
+    if (method === 'GET' && (m = /^\/pulls\/(\d+)\/files$/.exec(path))) {
+      const all = files.get(Number(m[1])) ?? [];
+      return json(200, all.slice((page - 1) * perPage, page * perPage));
+    }
     if (method === 'GET' && (m = /^\/pulls\/(\d+)$/.exec(path))) {
       const number = Number(m[1]);
       const pr = pulls.get(number);
@@ -175,6 +183,12 @@ export function fakeGitHub() {
       const issue = issues.get(number);
       if (!issue) throw new Error(`no issue ${number}`);
       issue.state = 'closed';
+    },
+    setFiles(
+      prNumber: number,
+      changed: { filename: string; previous_filename?: string; changes: number }[],
+    ) {
+      files.set(prNumber, changed);
     },
     setChecks(sha: string, runs: { status: string; conclusion: string | null }[]) {
       checks.set(sha, runs);

@@ -16,6 +16,9 @@ export type { Job } from './job.js';
 export { decide } from './policy.js';
 export type { Decision, PolicyContext, PullRequestState } from './policy.js';
 
+export { fastLaneVerdict, matchesGlob } from './fast-lane.js';
+export type { ChangedFile, FastLane, FastLaneVerdict } from './fast-lane.js';
+
 export { canAcceptJob, canStartRun } from './budget.js';
 export type { BudgetCheck, Usage } from './budget.js';
 

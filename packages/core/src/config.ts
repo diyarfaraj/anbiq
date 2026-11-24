@@ -35,6 +35,17 @@ const policySchema = z
     max_revisions: z.number().int().min(0).default(3),
     /** How many times QA or review may send work back to build before a person takes over. */
     max_bounces: z.number().int().min(0).default(3),
+    /**
+     * Low-risk changes that may take fewer stages. Left out, every job runs every stage.
+     * Whether a change qualifies is decided from the files it touches, never from the request.
+     */
+    fast_lane: z
+      .object({
+        paths: z.array(text).min(1),
+        max_changed_lines: z.number().int().positive().default(200),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

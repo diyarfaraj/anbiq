@@ -21,6 +21,21 @@ describe('parseCommand', () => {
     expect(parsed(input)).toEqual(expected);
   });
 
+  it('reads "quick:" as a request that asks for the short pipeline', () => {
+    expect(parsed('quick: fix the typo in the README')).toEqual({
+      type: 'request',
+      text: 'fix the typo in the README',
+      quick: true,
+    });
+    expect(parsed('Quick :  fix it ')).toEqual({ type: 'request', text: 'fix it', quick: true });
+    expect(parsed('quick fix for the header')).toEqual({
+      type: 'request',
+      text: 'quick fix for the header',
+    });
+    expect(parseCommand('quick:')).toMatchObject({ ok: false });
+    expect(commandText(parsed('quick: fix it'))).toBe('request');
+  });
+
   it('treats anything that is not an exact command as a new request', () => {
     expect(parsed('merge the header changes')).toEqual({
       type: 'request',
