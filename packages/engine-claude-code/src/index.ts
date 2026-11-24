@@ -5,7 +5,11 @@ import { CREW_INSTRUCTIONS } from './crews.js';
 export const RESULT_FILE = '.anbiq/result.json';
 
 const READ = ['Read', 'Glob', 'Grep'];
-const WRITE_RESULT = [`Write(${RESULT_FILE})`];
+/**
+ * Claude Code checks every file-writing tool, Write included, against Edit rules. A path rule
+ * spelled Write(…) grants nothing, and the crew then cannot report its result.
+ */
+const WRITE_RESULT = [`Edit(${RESULT_FILE})`];
 const COMMIT = [
   'Bash(git add:*)',
   'Bash(git commit:*)',

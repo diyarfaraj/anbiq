@@ -79,7 +79,8 @@ describe('allowedTools', () => {
       const tools = allowedTools(stage, verify);
       expect(tools).not.toContain('Edit');
       expect(tools).not.toContain('Write');
-      expect(tools).toContain(`Write(${RESULT_FILE})`);
+      expect(tools).toContain(`Edit(${RESULT_FILE})`);
+      expect(tools).not.toContain(`Write(${RESULT_FILE})`);
     }
   });
 
