@@ -178,6 +178,7 @@ jobs:
         if: always()
         env:
           START: ${{ steps.prepare.outputs.start }}
+          STAGE: ${{ inputs.stage }}
           EXECUTION_FILE: ${{ steps.claude-code.outputs.execution_file }}
         run: |
           out="$RUNNER_TEMP/out"
@@ -193,6 +194,13 @@ jobs:
             cost=$(jq '[.[]? | select(.type == "result") | .total_cost_usd // 0] | add // 0' "$EXECUTION_FILE" 2> /dev/null || echo null)
           elif [ -f "$RUNNER_TEMP/opencode.jsonl" ]; then
             cost=$(jq -s '[.[] | select(.type == "step_finish") | .part.cost // 0] | add // 0' "$RUNNER_TEMP/opencode.jsonl" 2> /dev/null || echo null)
+          fi
+          # A build or QA crew that passed but left changes uncommitted, for example because the
+          # agent refused its commit command, still did the work. Commit it rather than lose it.
+          if { [ "$STAGE" = build ] || [ "$STAGE" = qa ]; } && [ "$(jq -r '.outcome' "$out/result.json")" = passed ] \
+            && [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git -c core.hooksPath=/dev/null commit --quiet -m "Save the $STAGE crew's uncommitted work"
           fi
           head=$(git rev-parse HEAD)
           jq -n --arg start "${START:-}" --arg head "$head" --argjson cost "${cost:-null}" \

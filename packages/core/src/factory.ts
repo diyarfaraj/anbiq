@@ -3,7 +3,7 @@ import { commandText, parseCommand, type Command } from './command.js';
 import type { AnbiqConfig } from './config.js';
 import { fastLaneVerdict } from './fast-lane.js';
 import { findPerson, hasRole, type Person } from './identity.js';
-import { createJob, settle, transition } from './job.js';
+import { canTransition, createJob, settle, transition } from './job.js';
 import { decide, type PullRequestState } from './policy.js';
 import {
   HeadMovedError,
@@ -20,6 +20,7 @@ import {
   type JobRecord,
   type JobStore,
   type OutboundMessage,
+  type PullRequestRef,
   type RunResult,
   type Runner,
   type Tap,
@@ -602,14 +603,33 @@ export function createFactory(deps: FactoryDeps): Factory {
       ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
     });
 
-    if (result.outcome === 'needs-input') {
-      await block(job, result.stage, result.question ?? result.summary, true);
-    } else if (result.outcome === 'failed') {
-      await onFailed(job, result);
-    } else {
-      await onPassed(job, result);
+    try {
+      if (result.outcome === 'needs-input') {
+        await block(job, result.stage, result.question ?? result.summary, true);
+      } else if (result.outcome === 'failed') {
+        await onFailed(job, result);
+      } else {
+        await onPassed(job, result);
+      }
+    } catch (error) {
+      // The run is over and will not report again. Without this the job would sit in its stage
+      // for ever, with nothing running and nobody told.
+      await stranded(job.id, result.stage, error);
     }
     await drainQueue();
+  }
+
+  /** Hands a job to a person when the factory itself failed to act on a crew's result. */
+  async function stranded(jobId: string, stage: CrewStage, error: unknown): Promise<void> {
+    const job = await store.get(jobId);
+    if (!job || job.activeRun || job.queued || !canTransition(job.stage, 'blocked')) return;
+    const detail = error instanceof Error ? error.message : String(error);
+    await block(
+      job,
+      stage,
+      `The ${stage} crew finished, but Anbiq could not take the next step: ${detail}`,
+      false,
+    );
   }
 
   async function block(
@@ -663,12 +683,24 @@ export function createFactory(deps: FactoryDeps): Factory {
       case 'build': {
         let current = job;
         if (!current.pullRequest) {
-          const pr = await gitHost.openPullRequest({
-            jobId: job.id,
-            branch: job.branch,
-            title: job.title,
-            body: `${result.summary}\n\nRequested by ${job.requestedBy}.${job.issue ? `\n\nCloses ${job.issue.url}` : ''}`,
-          });
+          let pr: PullRequestRef;
+          try {
+            pr = await gitHost.openPullRequest({
+              jobId: job.id,
+              branch: job.branch,
+              title: job.title,
+              body: `${result.summary}\n\nRequested by ${job.requestedBy}.${job.issue ? `\n\nCloses ${job.issue.url}` : ''}`,
+            });
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            await block(
+              job,
+              'build',
+              `The build crew reported success, but no pull request could be opened from its branch. This usually means it committed nothing. Reply to send it back to build. (${detail})`,
+              false,
+            );
+            return;
+          }
           current = { ...current, pullRequest: pr };
           await emit({
             kind: 'pr.opened',
