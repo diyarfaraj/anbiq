@@ -275,6 +275,42 @@ describe('revisions and failures', () => {
     expect(f.runner.last().invocation.prompt).toContain('The booking confirmation page');
   });
 
+  it('hands over to a person when the build passed but no pull request can be opened', async () => {
+    const f = setup();
+    await f.say(OWNER, 'Tidy the readme');
+    await f.finish('passed'); // spec
+    f.gitHost.openPullRequest = async () => {
+      throw new Error('Validation Failed');
+    };
+
+    await f.finish('passed'); // build, with nothing committed
+    expect(f.lastReply()).toMatch(/needs a person/);
+    expect(f.tracker.issues.get('1')?.comments.at(-1)).toMatch(/committed nothing/);
+    expect(f.tracker.issues.get('1')?.stage).toBe('blocked');
+
+    // An answer sends it back to build, like any blocked job.
+    delete (f.gitHost as { openPullRequest?: unknown }).openPullRequest;
+    await f.say(OWNER, 'try again and commit this time');
+    expect(f.runner.last().stage).toBe('build');
+    await f.finish('passed');
+    expect(f.gitHost.pullRequests.size).toBe(1);
+  });
+
+  it('never leaves a job stuck in its stage when acting on a result fails', async () => {
+    const f = setup();
+    await f.say(OWNER, 'Add a button');
+    f.tracker.comment = async () => {
+      throw new Error('the tracker is down');
+    };
+    // Passing spec posts the criteria on the issue, which now fails.
+    await f.finish('passed').catch(() => {});
+    delete (f.tracker as { comment?: unknown }).comment;
+
+    expect(f.tracker.issues.get('1')?.stage).toBe('blocked');
+    await f.say(OWNER, 'status');
+    expect(f.lastReply()).not.toMatch(/Spec/i);
+  });
+
   it('ignores results from a run that was replaced', async () => {
     const f = setup();
     await f.say(OWNER, 'Add a button');

@@ -18,7 +18,7 @@ Your summary is the acceptance criteria themselves.`,
 - Write or update tests first where the codebase has tests, and make them fail for the right reason before fixing the code.
 - Follow the conventions already in the codebase: structure, naming, error handling, style.
 - Run the project's verify commands and fix what they report. Do not disable, skip or weaken tests or checks to make them pass.
-- Commit your work in small, focused commits with clear messages.
+- Commit your work in small, focused commits with clear messages. Run one plain command at a time, first git add with the paths and then git commit -m with the message: commands joined with && or ;, pipes, heredocs and command substitution are refused.
 - If feedback is included below, address it fully: it is from the person who reviewed the previous attempt, or from QA or review.
 
 Your summary lists what changed, and what you tested and did not test.`,
@@ -29,7 +29,7 @@ Your summary lists what changed, and what you tested and did not test.`,
 - Look for untested branches, edge cases and error paths in the changed code, and add tests where they are missing.
 - Review the diff for security problems: injection, unsafe input handling, secrets in code or logs, missing authorization checks.
 - Run the project's verify commands.
-- Commit any tests you add.
+- Commit any tests you add, one plain command at a time: first git add with the paths, then git commit -m with the message.
 
 Report passed only if every criterion is proven and nothing serious is open. Otherwise report failed, and make the summary a precise list of what the build crew must fix.`,
 
